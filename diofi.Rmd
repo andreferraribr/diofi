@@ -1,0 +1,211 @@
+---
+title: "diofi"
+output:
+  html_document:
+    code_folding: hide
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+options(scipen=999)
+options(digits = 2)
+```
+
+
+```{r, message=FALSE}
+library(flexdashboard)
+library(readxl)
+library(ggplot2)
+library(stringr)
+library(plotly)
+library(DT)
+library(flexdashboard)
+library(knitr)
+library(shiny)
+library(shinyWidgets)
+library(lubridate)
+library(tidyverse)
+
+```
+
+
+
+```{r}
+credito <- read_excel("credito.xlsx")
+str(credito)
+
+limite <- read_excel("limite.xlsx")
+
+pago <- read_excel("pago.xlsx")
+
+repasse <- read_excel("repasse.xlsx")
+
+
+
+```
+
+```{r}
+repasse <- repasse %>%
+  mutate (ug_ug_cod = str_c(ug_emit_cod,fav_cod))%>%
+  mutate (ug_cliente_cod = str_replace(ug_ug_cod, "170166",""))
+
+repasse <- repasse %>%
+  mutate (ug_ug = str_c(ug_emit,fav))%>%
+  mutate (ug_cliente = str_replace(ug_ug, "SUPERINTENDENCIA DE ADMINISTRACAO DO MF/SC",""))
+
+
+
+limite <- limite %>%
+  mutate (ug_ug_cod = str_c(ug_emit_cod,fav_cod))%>%
+  mutate (ug_cliente_cod = str_replace(ug_ug_cod, "170166",""))
+
+limite <- limite %>%
+  filter(doc_tipo == "PF")%>%
+  mutate ( ug_ug = if_else(fav_tipo_cod == "UG",str_c(ug_emit,fav),""))%>%
+  mutate (ug_cliente = str_replace(ug_ug, "SUPERINTENDENCIA DE ADMINISTRACAO DO MF/SC",""))
+
+
+ll <- unique(limite$ug_cliente)
+rr <- unique(repasse$ug_cliente)
+
+ll
+
+```
+
+
+
+```{r}
+datatable(credito%>%
+  group_by(ano,cc)%>%
+  summarise(saldo = round(sum (credito),2)),
+          filter = 'top', options = list(  pageLength = 25, autoWidth = TRUE, style = "default", width = 300))
+
+
+
+# limite por cliente e cc
+datatable(limite%>%
+  group_by(ano,ug_cliente,cc)%>%
+  summarise(saldo = round(sum (limite),2)),
+          filter = 'top', options = list(  pageLength = 25, autoWidth = TRUE, style = "default", width = 300))
+
+
+datatable(repasse%>%
+  group_by(ano,ug_cliente, cc)%>%
+  summarise(saldo = round(sum (repasse),2)),
+          filter = 'top', options = list(  pageLength = 25, autoWidth = TRUE, style = "default", width = 300))
+
+
+
+```
+
+
+```{r}
+
+
+emit_cred <-credito%>%
+  group_by(ano,ug_emit)%>%
+  summarise(saldo = round(sum (credito),2))
+
+
+emit_limite<-limite%>%
+  group_by(ano,ug_emit)%>%
+  summarise(saldo = round(sum (limite),2))
+
+datatable(limite%>%
+  group_by(ano,ug_emit)%>%
+  summarise(saldo = round(sum (limite),2)),
+          filter = 'top', options = list(  pageLength = 25, autoWidth = TRUE, style = "default", width = 300))
+
+
+emitente <- full_join(emit_limite, emit_cred, by = "ug_emit")
+
+
+
+datatable(repasse%>%
+  group_by(ano,cc)%>%
+  summarise(saldo = round(sum (repasse),2)),
+          filter = 'top', options = list(  pageLength = 25, autoWidth = TRUE, style = "default", width = 300))
+
+modelo_credito <- list (names(credito))
+modelo_limite <- list (names(limite))
+modelo_pago <- list (names(pago))
+modelo_repasse <- list (names(repasse))
+modelo<- list(modelo_repasse, modelo_credito, modelo_limite, modelo_pago)
+modelo
+
+```
+
+
+
+```{r}
+
+credito_nc_doc<- credito%>%
+  filter (doc_tipo == "NC")
+
+
+repasse_nc_doc<- repasse%>%
+  filter (doc_tipo == "NC")%>%
+  select(ug_cliente_cod, ug_cliente, doc, fonte_cod, repasse)
+
+repasse_credito<-full_join(credito_nc_doc, repasse_nc_doc, by = "doc")
+
+
+
+
+
+datatable(repasse_credito %>%
+  group_by(ano, ug_cliente,ugr,cc )%>%
+  summarise(saldo = round(sum (repasse), 2)),
+          filter = 'top', options = list(  pageLength = 5, autoWidth = TRUE, style = "default", width = 300))
+
+## detaorc
+cc<-credito%>%
+  filter(doc_tipo != "NC" , doc_tipo != "NE", ano == "2019", credito > 0)%>%
+  select(ugr, cc, doc_tipo, ug_emit, credito, doc)%>%
+  group_by(doc, cc )%>%
+  summarise(saldo = sum (credito))
+
+
+dd<-credito%>%
+  filter(doc_tipo != "NC" , doc_tipo != "NE", ano == "2019", credito < 0)%>%
+  select(ugr, cc, doc_tipo, ug_emit, credito, doc)%>%
+  group_by(doc, cc )%>%
+  summarise(saldo = sum (credito))
+  
+cc
+
+dd
+
+
+ddcc<- merge (cc,dd, by = "doc")
+
+ddcc
+
+
+
+
+cc<-credito%>%
+  filter(doc_tipo != "NC" , doc_tipo != "NE", ano == "2019", credito > 0)%>%
+  select(ugr, cc, doc_tipo, ug_emit, credito, doc)%>%
+  group_by(doc )%>%
+  summarise(saldo = sum (credito))
+
+
+dd<-credito%>%
+  filter(doc_tipo != "NC" , doc_tipo != "NE", ano == "2019", credito < 0)%>%
+  select(ugr, cc, doc_tipo, ug_emit, credito, doc)%>%
+  group_by(doc )%>%
+  summarise(saldo = sum (credito))
+  
+cc
+
+dd
+
+
+ddcc<- merge (cc,dd, by = "doc")
+
+ddcc
+
+```
+
