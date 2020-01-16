@@ -38,7 +38,15 @@ Vamos iniciar importando os dados:
 # importar as tabelas com os saldos:
 
 # Item de Informação: Crédito Disponível (19)
-credito <- read_excel("credito.xlsx")
+credito <- read_excel("cred.xlsx")
+
+colnames(credito)<-c("ano","org_uo_cod", "org_uo", "uo_cod", "uo", "ugr_cod", "ugr", "cc", "PTRES", "nd_cod", "nd", "fonte_cod", "fonte","pi_cod","pi", "ug_emit_cod", "ug_emit", "fav_cod", "fav", "fav_tipo_cod", "fav_tipo", "data_emi", "doc_tipo", "ug_lanca", "data_lan", "hora_acesso", "doc", "obs", "credito")
+
+
+credito<- credito%>%
+  mutate ( ug_ug = if_else(fav_tipo_cod == "UG",str_c(ug_emit_cod,fav_cod,ug_emit,fav),""))%>%
+  mutate (ug_cliente = str_replace(ug_ug, "SUPERINTENDENCIA DE ADMINISTRACAO DO MF/SC",""))%>%
+  mutate (ug_cliente = str_replace(ug_cliente, "170166",""))
 
 # Item de Informação: LIMITES DE SAQUE (OFSS, DIVIDA, BACEN E PREV) (71)
 limite <- read_excel("limite.xlsx")
@@ -49,6 +57,11 @@ pago <- read_excel("pago.xlsx")
 # Contas Contábies: RECEBIMENTO DE REPASSE A PROGR POR DESC EXT (822221201) e RECEBIMENTO DE SUB-REPASSE A PROGRAMAR (822230100)
 repasse <- read_excel("repasse.xlsx")
 
+# Contas Contábies: EXECUCAO DE PAGAMENTOS EFETUADOS (891100000) 
+efetuados <- read_excel("total_pago.xlsx")
+
+neccor<- data.frame("neccor" = unique(pago$neccor))
+write.table(neccor, "C:/Users/03092181794/Desktop/R/diofi/neccor.txt", sep="\t")
 ```
 
 Agora vamos apresentar os pagentos realizados pela GRA/SC
@@ -146,7 +159,7 @@ Identificar os clientes
 ```{r}
 
 
-repasse <- repasse %>%
+repasse_nc <- repasse %>%
   # somente nota de crédito
   filter(doc_tipo == "NC")%>%
   # somente se favorecido for UG concatenar código e nome da ug emitente e da ug favorecida
@@ -158,14 +171,14 @@ repasse <- repasse %>%
 
 
  # mesma rotina do repasse
-credito <- credito %>%
+credito_nc <- credito %>%
   filter(doc_tipo == "NC")%>%
   mutate ( ug_ug = if_else(fav_tipo_cod == "UG",str_c(ug_emit_cod,fav_cod,ug_emit,fav),""))%>%
   mutate (ug_cliente = str_replace(ug_ug, "SUPERINTENDENCIA DE ADMINISTRACAO DO MF/SC",""))%>%
   mutate (ug_cliente = str_replace(ug_cliente, "170166",""))
 
  # mesma rotina do repasse, apenas filtrar por "PF"
-limite <- limite %>%
+limite_pf <- limite %>%
   filter(doc_tipo == "PF")%>%
   mutate ( ug_ug = if_else(fav_tipo_cod == "UG",str_c(ug_emit_cod,fav_cod,ug_emit,fav),""))%>%
   mutate (ug_cliente = str_replace(ug_ug, "SUPERINTENDENCIA DE ADMINISTRACAO DO MF/SC",""))%>%
@@ -176,9 +189,9 @@ limite <- limite %>%
 
 # verificar a consistência dos clientes
 # selecionar clientes únicos do repasse, credito e limite
-ll <- data.frame("ug_cliente_limite" = unique(limite$ug_cliente))
-rr <- data.frame("ug_cliente_repasse" = unique(repasse$ug_cliente))
-cc <- data.frame("ug_cliente_credito" = unique(credito$ug_cliente))
+ll <- data.frame("ug_cliente_limite" = unique(limite_pf$ug_cliente))
+rr <- data.frame("ug_cliente_repasse" = unique(repasse_nc$ug_cliente))
+cc <- data.frame("ug_cliente_credito" = unique(credito_nc$ug_cliente))
 
 
 # ordenar os clientes
@@ -187,8 +200,10 @@ rr<- arrange (rr, ug_cliente_repasse)
 cc<- arrange (cc, ug_cliente_credito)
 
 # verificar a igualdade
-ll_rr_cc <- do.call("cbind", list(cc,ll,rr))%>%
-  mutate (ok = if_else(ug_cliente_limite == ug_cliente_repasse & ug_cliente_repasse == ug_cliente_credito, "ok", "problema"  ))
+##ll_rr_cc <- do.call("cbind", list(cc,ll,rr))%>%
+##  mutate (ok = if_else(ug_cliente_limite == ug_cliente_repasse & ug_cliente_repasse == ug_cliente_credito, "ok", "problema"  ))
+
+## ll_rr_cc
 ```
 
 
@@ -201,19 +216,26 @@ datatable(credito%>%
 
 
 
-# limite por cliente e cc
-datatable(limite%>%
-  group_by(ano,ug_cliente,cc)%>%
-  summarise(saldo = round(sum (limite),2)),
-          filter = 'top', options = list(  pageLength = 25, autoWidth = TRUE, style = "default", width = 300))
 
 
-datatable(repasse%>%
-  group_by(ano,ug_cliente, cc)%>%
-  summarise(saldo = round(sum (repasse),2)),
-          filter = 'top', options = list(  pageLength = 25, autoWidth = TRUE, style = "default", width = 300))
+datatable(pago%>%
+  group_by(ano,neccor)%>%
+  summarise(saldo = round(sum (pago),2)),
+          filter = 'top', options = list(  pageLength = 5, autoWidth = TRUE, style = "default", width = 300))
+
+pago_ne<- pago%>%
+  group_by(neccor)%>%
+  summarise(saldo = round(sum (pago),2))
 
 
+
+credito_ne<- credito%>%
+  filter(doc_tipo == "NE")%>%
+  group_by(doc)%>%
+  summarise(saldo = round(sum (credito),2))
+
+
+credito_pago<- full_join(credito_ne, pago_ne, by = c("doc" = "neccor") )
 
 ```
 
@@ -280,14 +302,11 @@ dd<-credito%>%
   group_by(doc, cc )%>%
   summarise(saldo = sum (credito))
   
-cc
-
-dd
 
 
 ddcc<- merge (cc,dd, by = "doc")
 
-ddcc
+
 
 
 
@@ -305,14 +324,48 @@ dd<-credito%>%
   group_by(doc )%>%
   summarise(saldo = sum (credito))
   
-cc
 
-dd
 
 
 ddcc<- merge (cc,dd, by = "doc")
 
-ddcc
+
+
+```
+
+
+```{r}
+cc<-credito%>%
+  filter(credito > 0, ano == "2019")%>%
+  select(cc, doc_tipo, ug_emit, credito, doc)%>%
+  group_by(doc, cc , doc_tipo)%>%
+  summarise(saldo = sum (credito))
+
+
+dd<-credito%>%
+  filter( credito < 0, ano == "2019")%>%
+  select(ugr, cc, doc_tipo, ug_emit, credito, doc)%>%
+  group_by(cc, doc, doc_tipo )%>%
+  summarise(saldo = sum (credito))
+  
+
+tt<- neccor$neccor
+
+ddcc<- merge (cc,dd, by = "cc")
+
+ddccor<-ddcc%>% filter (doc.y %in% neccor$neccor, doc_tipo.x != "NC" )
+(unique(ddcc$doc.x))
+
+ddcc_nd<-ddcc%>% filter (doc.y %in% ddccor$doc.x, doc_tipo.x == "NC" )%>%
+  select(doc.x)
+(unique(ddcc_nd$doc.x))
+
+nc_clientes <- c(unique(ddcc$doc.x),unique(ddcc_nd$doc.x))
+
+final<-credito%>% filter (doc %in% nc_clientes,ano =="2019", ug_cliente != "")%>%
+  group_by( PTRES, fonte_cod, nd_cod, ugr_cod, pi_cod)%>%
+  summarise(saldo = round(as.numeric(sum (credito)),2))
+
 
 ```
 
