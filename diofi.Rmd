@@ -9,7 +9,7 @@ output:
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 options(scipen=999)
-options(digits = 2)
+options(digits = 4)
 ```
 
 
@@ -48,11 +48,52 @@ credito<- credito%>%
   mutate (ug_cliente = str_replace(ug_ug, "SUPERINTENDENCIA DE ADMINISTRACAO DO MF/SC",""))%>%
   mutate (ug_cliente = str_replace(ug_cliente, "170166",""))
 
+credito_teste<- credito%>% filter (ugr_cod == "170166")%>%
+  select(cc, doc, credito, ug_cliente)%>%
+  group_by(cc)%>%
+  summarise(ug_teste = max (ug_cliente))
+
+
+credito<- credito%>% 
+  group_by(cc)%>%
+  mutate(ug_teste = max (ug_cliente))
+
+credito_teste_nd_dd<- credito%>% filter (credito>0)%>%
+  select(cc, doc, credito, ug_cliente)%>%
+  group_by(cc)%>%
+  summarise(ug_cliente = max(ug_cliente))
+
+
+
+credito_teste_nd_cc<- credito%>% filter (credito<0)%>%
+  select(cc, doc, credito, ug_cliente)%>%
+  group_by(cc)%>%
+  summarise(ug_cliente = max(ug_cliente))
+
+
+credito_teste2<- credito%>% 
+  select(cc, doc, credito, ug_cliente)%>%
+  group_by(cc, ug_cliente)%>%
+  summarise(saldo = sum (credito))
+
+credito_pp<- full_join (credito, credito_teste)%>%
+  group_by(ano, ug_teste, cc)%>%
+  summarise(saldo = round( sum (credito),3))
+
+teste<- credito%>%
+  filter (ano == "2019")%>%
+  group_by (ug_teste, cc)%>%
+  summarise (saldo = round(sum (credito),4))
+
+(sum(credito_pp$saldo))
+
 # Item de Informação: LIMITES DE SAQUE (OFSS, DIVIDA, BACEN E PREV) (71)
 limite <- read_excel("limite.xlsx")
 
 # Item de Informação: PAGAMENTOS TOTAIS (EXERCICIO E RAP) (56) 
 pago <- read_excel("pago.xlsx")
+
+#pago<- pago%>% filter (uo_cod = "25103")
 
 # Contas Contábies: RECEBIMENTO DE REPASSE A PROGR POR DESC EXT (822221201) e RECEBIMENTO DE SUB-REPASSE A PROGRAMAR (822230100)
 repasse <- read_excel("repasse.xlsx")
