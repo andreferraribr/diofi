@@ -31,29 +31,42 @@ library(shinyWidgets)
 library(lubridate)
 library(tidyverse)
 library(tinytex)
+library(reader)
 
 
+```
+
+
+```{r}
+dados = function(df, depara){
+  nome <- read_xlsx(df)
+  tg2r <- read_xlsx(depara)
+  colnames(nome)<-tg2r$r_name
+  return(nome)
+}
 ```
 
 
 
 ```{r include=FALSE}
 
+#  importar relatório gerado no Tesouro Gerencial
 credito <- read_excel("r_credito.xlsx")
 
-rateio_cota <- read_excel("rateio_cota.xlsx")
+# importar planilha com o de_para dos nomes dos atributos do Tesouro Gerencial para nomes mais amigáveis para as variáveis. Por exemplo, de(Unidade Orçamentária Código) para(uo_cod)
+tg2r_credito <- read_excel("tg2r_credito.xlsx")
 
-tg2r_credito <- read_csv("tg2r_credito.csv")
-
+# renomear as colunas da df credito fazendo o de_para
 colnames(credito)<-tg2r_credito$r_name 
 
+# excluir a coluna "vazio" (o Tesouro Gerencial gera uma coluna sem dados)
 credito <- credito %>% select (-"vazio")
 
 pago <- read_excel("pago.xlsx")
 
 balancete <- read_excel("balancete.xlsx")
 
-colunas <- read_csv("colunas.csv")
+colunas <- read_csv("tg2r_balancete.xlsx")
 
 colnames(balancete)<-colunas$r 
 
@@ -113,7 +126,7 @@ colunm
 ```{r}
 
 renderDT({
-datatable ((custos %>%   group_by(uo, ug_icc) %>% summarise(custo = round(sum(custo), 2))),filter = 'top', options = list(pageLength = 5, autoWidth = TRUE))
+datatable ((custos %>%   group_by(uo, ug_icc, ugr, centro_custo, org) %>% summarise(custo = round(sum(custo), 2))),filter = 'top', options = list(pageLength = 5, autoWidth = TRUE))
   
 })  
 ```
@@ -130,9 +143,52 @@ custos <- custos %>% mutate (mes = ymd (paste0(custos$mm_ano_cod,"01")))
 
 meses <-custos %>% group_by(mm_ano_cod, mm_ano) %>% summarise(n = n())
 
+custos <- custos %>% mutate(org = case_when(
+  centro_custo_cod == "S6SC002MCTI" ~ "MCTIC",
+  centro_custo_cod == "S6SC001ABIN" ~ "ABIN",
+  centro_custo_cod == "S6SC001INPI" ~ "INPI",
+  centro_custo_cod == "S6SC003CGU"  ~ "CGU",
+  centro_custo_cod == "S612SC001"   ~ "GRA",
+  centro_custo_cod == "S612SC002"   ~ "GRA",
+  centro_custo_cod == "S612SC003"   ~ "GRA",
+  centro_custo_cod == "S672SC003"   ~ "SPU",
+  centro_custo_cod == "S621SC003"   ~ "PFN",
+  TRUE  ~ "outras localidades"
+    
+  )
+)
 
 
-gra <- c("S6SC002MCTI", "S6SC001ABIN", "S6SC001INPI", "S6SC002CGU", "S6SC003CGU", "S612SC001", "S612SC002", "S612SC003", "S672SC003") 
+custos <- custos %>% mutate(org_custo = case_when(
+  centro_custo_cod == "S6SC002MCTI" ~ "MCTIC",
+  centro_custo_cod == "S6SC001ABIN" ~ "ABIN",
+  centro_custo_cod == "S6SC001INPI" ~ "INPI",
+  centro_custo_cod == "S6SC003CGU"  ~ "CGU",
+  centro_custo_cod == "S612SC001"   ~ "GRA",
+  centro_custo_cod == "S612SC002"   ~ "GRA",
+  centro_custo_cod == "S612SC003"   ~ "GRA",
+  centro_custo_cod == "S672SC003"   ~ "GRA",
+  centro_custo_cod == "S621SC003"   ~ "GRA",
+  TRUE  ~ "outras orgs"
+    
+  )
+)
+
+
+
+custos <- custos %>% mutate(org_credito = case_when(
+  uo_cod == "24101" ~ "MCTIC",
+  uo_cod == "20118" ~ "ABIN",
+  uo_cod == "25297" ~ "INPI",
+  uo_cod == "37101"  ~ "CGU",
+  uo_cod == "25101"   ~ "GRA",
+  TRUE  ~ "outras uos"
+    
+  )
+)
+
+
+gra <- c("S6SC002MCTI", "S6SC001ABIN", "S6SC001INPI", "S6SC003CGU", "S612SC001", "S612SC002", "S612SC003", "S672SC003", "S621SC003" ) 
 
 rateio <- c("05027397000129", "05600954000159","08336783000190","10364152000127","78533312000158","82508433000117","82892282000143")
 
@@ -143,6 +199,11 @@ custo_mensal_gra <- custos %>% filter (centro_custo_cod %in% gra) %>%  group_by(
 custo_mensal_rateio <- custos %>% filter (centro_custo_cod %in% gra, favorecido_cod %in% rateio) %>%  group_by(ndd,favorecido, mm_ano_cod) %>% summarise(custo = sum(custo)) %>% pivot_wider( names_from = mm_ano_cod, values_from = custo)
 
 
+(saldo_org <- custos %>% filter (centro_custo_cod %in% gra, favorecido_cod %in% rateio) %>%  group_by(org_custo) %>% summarise(custo = sum(custo)) )
+
+(saldo_uo <- custos %>% filter (centro_custo_cod %in% gra, favorecido_cod %in% rateio) %>%  group_by(org_credito) %>% summarise(credito = sum(custo)) )
+
+(saldo_custo <- full_join(saldo_org,saldo_uo, by = c ("org_custo" = "org_credito")) %>% mutate_all(~replace(., is.na(.), 0))%>% mutate(saldo = credito - custo))
   
 custo_mensal_centro <- custos %>% group_by(centro_custo_cod, mm_ano_cod) %>% summarise(custo = sum(custo)) %>% pivot_wider( names_from = mm_ano_cod, values_from = custo)
  
@@ -232,6 +293,74 @@ renderDT({
 })  
 ```
 
+### gauge
+
+```{r}
+
+renderPlotly({
+fig <- plot_ly(
+  domain = list(x = c(0, 1), y = c(0, 1)),
+  value = 450,
+  title = list(text = "Speed"),
+  type = "indicator",
+  mode = "gauge+number",
+  # delta = list(reference = 380),
+  gauge = list(
+    axis =list(range = list(NULL, 500)),
+    # steps = list(
+    #   list(range = c(0, 250), color = "lightgray"),
+    #   list(range = c(250, 400), color = "gray")),
+    threshold = list(
+      line = list(color = "red", width = 4),
+      thickness = 0.75,
+      value = 490))) 
+fig <- fig %>%
+  layout(margin = list(l=20,r=30))
+
+ggplotly(fig)
+})
+```
+
+### time
+
+```{r}
+renderPlotly({
+  # criar df_br para consolidar arrecadação mês a mês em todo o país.
+  df_br<-custos %>% filter (centro_custo_cod %in% gra, favorecido_cod %in% rateio) %>% group_by(mes) %>% summarise(custo = sum(custo))
+  
+  
+ historico<- ggplot( df_br, aes(  x= mes , y=cumsum(custo))) +
+    geom_area() +
+    geom_hline(yintercept=680000, colour = "red", linetype = "dashed") +
+    theme_classic() +
+    ylab("") +
+    xlab("") +
+    # https://ggplot2.tidyverse.org/reference/scale_date.html
+    # apresentar os anos 2015, 2016 , 2017, 2018, 2019 e 2020 na escal do eixo X
+    # scale_x_date(date_breaks = "1 year", date_labels = "%Y")+ 
+    theme(axis.text.x = element_text(size=8),
+          axis.text.y = element_text(size=8))
+  historico
+ggplotly(historico)  
+})
+```
+```{r}
+
+df_br<-custos %>% filter (centro_custo_cod %in% gra, favorecido_cod %in% rateio) %>% group_by(mes) %>% summarise(custo = sum(custo))
+  
+ historico<- ggplot( df_br, aes(  x= mes , y=cumsum(custo))) +
+    geom_line() +
+    geom_hline(yintercept=680000, colour = "red", linetype = "dashed") +
+    theme_classic() +
+    ylab("") +
+    xlab("") +
+    # https://ggplot2.tidyverse.org/reference/scale_date.html
+    # apresentar os anos 2015, 2016 , 2017, 2018, 2019 e 2020 na escal do eixo X
+    # scale_x_date(date_breaks = "1 year", date_labels = "%Y")+ 
+    theme(axis.text.x = element_text(size=8),
+          axis.text.y = element_text(size=8))
+  historico
+```
 
 
 ```{r include=FALSE}
@@ -251,9 +380,27 @@ ggplotly(p)
 
 
 ```{r}
-rateio_final <- (cbind(custo_mensal_rateio[,1:2], custo_mensal_rateio[,3:length(custo_mensal_rateio)] * rateio_cota[,3:length(rateio_cota)] ))
 
 
+# rateio_final_drive<- write_csv(rateio_final,"rateio_final_drive.csv" )
 
 ```
+
+heat
+=============================================
+### heat
+
+```{r}
+renderPlotly({
+df_br<-custos %>% filter (centro_custo_cod %in% gra, favorecido_cod %in% rateio) %>% group_by(mes, ndd) %>% summarise(custo = sum(custo))
+
+teste <- ggplot(df_br, aes(mes, ndd, fill= custo)) + 
+  geom_tile() +
+  scale_fill_gradient(low="grey", high="red")+
+  theme_classic()
+ggplotly(teste)
+})
+```
+
+
 
