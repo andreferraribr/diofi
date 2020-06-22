@@ -1,0 +1,100 @@
+---
+title: "limite"
+output: html_document
+---
+
+
+```{r opcao}
+options(scipen=999)
+```
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+library(data.table)
+library(stringr)
+library(tidyverse)
+library(lubridate)
+library(vroom)
+library(ggplot2)
+library(readxl)
+```
+
+```{r}
+limite <- read_xlsx("limite_ufsc.xlsx")
+
+limite_todas <- read_xlsx("limite_universidades.xlsx")
+```
+
+
+```{r}
+
+`%notin%` <- Negate(`%in%`)
+
+limite <- limite %>% mutate (`Dia Lançamento`  = if_else (`Dia Lançamento` == "000/2015", str_replace(`Dia Lançamento`, "000", "01/01"), `Dia Lançamento`  ) )
+
+ limite <- limite %>% filter(`Dia Lançamento` %notin% c ("01/01/2016", "01/01/2017", "01/01/2018", "01/01/2019", "01/01/2020"))
+  
+
+
+limite <- limite %>% mutate (`Dia`  = dmy(`Dia Lançamento`)) 
+
+fluxo <- limite %>% group_by(`Dia`) %>% summarise(saldo = sum(`saldo dia R$`)) %>% mutate (acumulado = cumsum(saldo))
+
+
+
+
+```
+
+
+```{r}
+limite_todas <- limite_todas %>% mutate (`Dia Lançamento`  = if_else (`Dia Lançamento` == "000/2009", str_replace(`Dia Lançamento`, "000", "01/01"), `Dia Lançamento`  ) )
+
+ limite_todas <- limite_todas %>% filter(   `Dia Lançamento` %notin% c ("01/01/2010","01/01/2011","01/01/2012","01/01/2013","01/01/2014","01/01/2015","01/01/2016", "01/01/2017", "01/01/2018", "01/01/2019", "01/01/2020"))
+  
+
+
+limite_todas <- limite_todas %>% mutate (`Dia`  = dmy(`Dia Lançamento`))
+
+fluxo_todas <- limite_todas %>% group_by(`Dia` ) %>% summarise(saldo = sum(`saldo dia R$`)) %>% mutate (acumulado = cumsum(saldo))
+
+fluxo_todas %>% na.omit(fluxo_todas)
+```
+
+str(limite_todas)
+
+```{r}
+ggplot() + geom_line(data = fluxo,aes(x = `Dia`, y = `acumulado`/1000000))
+```
+
+
+```{r}
+fluxo <- fluxo %>% mutate (dia = day(Dia), mes = month(Dia), ano = year(Dia))
+
+df_dia<-fluxo   %>% filter(ano == "2019") %>%  group_by( mes, dia) %>% summarise(valor = round(sum(saldo), digits = 2)) 
+# ajustar ordem dos fatores para plotar cada exercício em uma linha 
+df_dia$dia <- factor(df_dia$dia)
+df_dia$mes <- as.numeric(df_dia$mes)
+df_dia$dia<- as.numeric(df_dia$dia)
+#https://forcats.tidyverse.org/reference/fct_rev.html
+df_dia$mes<- fct_rev(factor(df_dia$mes))
+p<-ggplot() + geom_line(data = df_dia,aes(x = dia, y = valor, color = mes))+
+  facet_grid(rows = vars(mes))
+                        # criar escala de cor, com purple para o exercício mais recente e cinza para os demais exercícios (fica mais claro a medida que é mais antigo)
+      # scale_color_manual(breaks = levels(df_dia$exercicio),
+                        # values=c("purple", "gray1", "gray20", "gray40", "gray60", "gray80"))+
+                        # theme_classic()+
+                        # ylab("") +
+                        # xlab("") 
+                        # https://ggplot2.tidyverse.org/reference/scale_date.html
+                        # apresentar apenas os meses de "abril", "agosto", "dezembro" na escala do eixo X
+                        # scale_x_continuous(breaks=c(4,8,12),
+                                          # labels=c("abril", "agosto", "dezembro"))
+p                      
+# ggplotly(p)
+```
+

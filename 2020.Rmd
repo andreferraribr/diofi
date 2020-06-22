@@ -1,0 +1,98 @@
+---
+title: "2020"
+output:
+  html_document:
+    code_folding: hide
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+options(scipen=999)
+options(digits=2)
+```
+
+
+```{r, message=FALSE}
+library(flexdashboard)
+library(readxl)
+library(ggplot2)
+library(stringr)
+library(plotly)
+library(DT)
+library(flexdashboard)
+library(knitr)
+library(shiny)
+library(shinyWidgets)
+library(lubridate)
+library(tidyverse)
+
+```
+A nossa meta é automatizar a prestação de contas da Gerência Regional de Administração do Ministério da Economia em Santa Catarina, GRA/SC, referente à utilização dos recursos orçamentários e financeiros.
+
+A GRA/SC gere a atividade meio de algumas unidades administrativas do poder executivo federal localizadas no estado de Santa Catarina. Por exemplo, a GRA/SC recebe via Nota de Crédito (NC) recursos orçamentários para contratar serviço de vigilância para as unidades estaduais da CGU, PGFN, SPU, SRTb (nossos clientes). Ao longo do ano, a GRA/SC também recebe via Nota de Programação Financeira (PF) os recursos financeiros para pagar as faturas deste serviço de vigilância.
+
+
+
+Vamos iniciar importando os dados:
+```{r}
+# dados obtidos via Tesouro Gerencial
+# importar as tabelas com os saldos:
+
+# Item de Informação: Crédito Disponível (19)
+credito <- read_excel("credito.xlsx")
+
+#data.table::data.table(credito %>% group_by(ug re))
+
+
+
+# identificar o conta corrente do crédito disponível
+credito_ccor <- credito  %>% group_by(PTRES) %>% summarise(credito = sum(`Movim. Líquido - R$ (Item Informação)`))
+
+
+datatable(credito_ccor)%>%
+                  formatRound("credito",
+                      digits = 2,
+                      interval = 3,
+                      mark = ".",
+                      dec.mark = ",") 
+
+
+# vincular o conta corrente à ug emitende do documento de descentralização de crédito
+# excluir a ug emitente 170166 para excluir as devoluções de crédito 
+credito_rec <- credito %>% filter( `Doc - Tipo Código` == "NC", `Emitente - UG Código` != "170166") %>% group_by(`Emitente - UG Nome`,`Emitente - UG Código`, `UG Responsável Nome`,PTRES) %>% summarise(recebido = sum(`Movim. Líquido - R$ (Item Informação)`))
+
+
+
+# vincular o valor empenhado ao cliente (ug emitente da NC)
+cliente <- left_join(credito_ccor, credito_rec, by = "PTRES")
+
+
+datatable(cliente %>% group_by(`Emitente - UG Nome`, `Emitente - UG Código`, `UG Responsável Nome`) %>% summarise( credito = sum (credito))) %>% 
+                  formatRound("credito",
+                      digits = 2,
+                      interval = 3,
+                      mark = ".",
+                      dec.mark = ",") 
+
+
+
+# obter dados de pagamento com informação capaz de replicar o conta corrente do crédito (esfera, ptres, fonte, nd, ugr e pi)
+# tratar código -8 do pi e ugr
+# concatenar códigos para replicar o conta corrente do crédito
+# 
+
+credito_ccor %>% 
+  count(PTRES) %>% 
+  filter(n > 1)
+
+```
+
+```{r}
+
+
+pago <- read_excel("pago.xlsx")
+
+
+```
+

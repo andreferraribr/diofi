@@ -9,8 +9,10 @@ output:
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 options(scipen=999)
-options(digits = 4)
+options(digits=2)
 ```
+
+
 
 
 ```{r, message=FALSE}
@@ -28,6 +30,23 @@ library(lubridate)
 library(tidyverse)
 
 ```
+
+
+
+```{r}
+add_color <- function(string, color) {
+ if (knitr::is_latex_output()) {
+   sprintf("\\textcolor{%s}{%s}", color, string)
+ } else if (knitr::is_html_output()) {
+   sprintf("<span style='color: %s;'>%s</span>", color, 
+     string)
+ } else string
+}
+```
+
+
+
+
 A nossa meta é automatizar a prestação de contas da Gerência Regional de Administração do Ministério da Economia em Santa Catarina, GRA/SC, referente à utilização dos recursos orçamentários e financeiros.
 
 A GRA/SC gere a atividade meio de algumas unidades administrativas do poder executivo federal localizadas no estado de Santa Catarina. Por exemplo, a GRA/SC recebe via Nota de Crédito (NC) recursos orçamentários para contratar serviço de vigilância para as unidades estaduais da CGU, PGFN, SPU, SRTb (nossos clientes). Ao longo do ano, a GRA/SC também recebe via Nota de Programação Financeira (PF) os recursos financeiros para pagar as faturas deste serviço de vigilância.
@@ -42,6 +61,14 @@ credito <- read_excel("cred.xlsx")
 
 colnames(credito)<-c("ano","org_uo_cod", "org_uo", "uo_cod", "uo", "ugr_cod", "ugr", "cc", "PTRES", "nd_cod", "nd", "fonte_cod", "fonte","pi_cod","pi", "ug_emit_cod", "ug_emit", "fav_cod", "fav", "fav_tipo_cod", "fav_tipo", "data_emi", "doc_tipo", "ug_lanca", "data_lan", "hora_acesso", "doc", "obs", "credito")
 
+cc_credito <- credito %>% filter (ano == "2019") %>% group_by(cc) %>% summarise(credito = sum(credito))
+
+datatable(cc_credito)%>%
+                  formatRound("credito",
+                      digits = 2,
+                      interval = 3,
+                      mark = ".",
+                      dec.mark = ",") 
 
 credito<- credito%>%
   mutate ( ug_ug = if_else(fav_tipo_cod == "UG",str_c(ug_emit_cod,fav_cod,ug_emit,fav),""))%>%
@@ -102,7 +129,7 @@ repasse <- read_excel("repasse.xlsx")
 efetuados <- read_excel("total_pago.xlsx")
 
 neccor<- data.frame("neccor" = unique(pago$neccor))
-write.table(neccor, "C:/Users/03092181794/Desktop/R/diofi/neccor.txt", sep="\t")
+#write.table(neccor, "C:/Users/03092181794/Desktop/R/diofi/neccor.txt", sep="\t")
 ```
 
 Agora vamos apresentar os pagentos realizados pela GRA/SC
@@ -203,6 +230,16 @@ Identificar os clientes
 repasse_nc <- repasse %>%
   # somente nota de crédito
   filter(doc_tipo == "NC")%>%
+  # somente se favorecido for UG concatenar código e nome da ug emitente e da ug favorecida
+  # a movimentação de crédito ocorre tanto do cliente para a GRA quanto da GRA para o cliente
+  mutate ( ug_ug = if_else(fav_tipo_cod == "UG",str_c(ug_emit_cod,fav_cod,ug_emit,fav),""))%>%
+  # retirar o nome e o código da GRA e manter apenas o código/nome do cliente
+  mutate (ug_cliente = str_replace(ug_ug, "SUPERINTENDENCIA DE ADMINISTRACAO DO MF/SC",""))%>%
+  mutate (ug_cliente = str_replace(ug_cliente, "170166",""))
+
+repasse_pf <- repasse %>%
+  # somente nota de crédito
+  filter(doc_tipo == "PF")%>%
   # somente se favorecido for UG concatenar código e nome da ug emitente e da ug favorecida
   # a movimentação de crédito ocorre tanto do cliente para a GRA quanto da GRA para o cliente
   mutate ( ug_ug = if_else(fav_tipo_cod == "UG",str_c(ug_emit_cod,fav_cod,ug_emit,fav),""))%>%
@@ -313,13 +350,71 @@ modelo_limite <- list (names(limite))
 modelo_pago <- list (names(pago))
 modelo_repasse <- list (names(repasse))
 modelo<- list(modelo_repasse, modelo_credito, modelo_limite, modelo_pago)
-modelo
+# modelo
+
+```
+
+```{r new}
+cliente_repasse <- repasse_nc %>% group_by(ug_cliente, fonte, fonte_cod) %>% summarize(repasse = sum (repasse))
+
+cliente_ptres <- credito %>% filter (ug_teste != "", ug_emit_cod != 170166) %>% group_by(ug_teste, PTRES) %>% filter (doc_tipo == "NC") %>% summarise(credito = sum(credito))
+
+pago_ptres <- pago %>% filter(doc_origem_tipo == "OB") %>% group_by(PTRES, doc_lanca) %>%  summarise(pago = sum(pago))
+
+
+pago_cliente <- right_join(cliente_ptres, pago_ptres, by = "PTRES") %>% select(-credito, -PTRES)
+
+
+efetudos_clientes <- left_join(efetuados, pago_cliente,  c("doc" = "doc_lanca"))
+
+efetuados_fonte_vinc <- efetudos_clientes %>% group_by(ug_teste,fonte, fonte_cod, vinc ) %>%  summarise(pago = sum (pago))
+```
+
+
+
+```{r}
+(efetuados %>% summarise(total = sum(efetuado)))
+
+pago %>% summarise(total = sum(pago))==efetuados %>% summarise(total = sum(efetuado))
+
+
+df_efetuado <- efetuados %>% select(doc, fonte, fonte_cod, vinc, efetuado)
+
+df_pago <- pago %>% filter (doc_origem_tipo == "OB") %>% select(neccor, doc_lanca, PTRES)
+
+df_neccor_efetuado <- left_join(df_efetuado, df_pago, by  =c("doc" = "doc_lanca"))
+
+```
+
+
+```{r}
+key_pago <- pago  %>% filter (ano == "2019") %>% group_by (neccor,doc_lanca) %>%  summarise(pago = sum(pago))%>% mutate(key = paste0(neccor,doc_lanca))
+
+key_pago <- key_pago %>% mutate(key = paste0(neccor,doc_lanca)) 
+
+key_cred <- right_join(credito, key_pago, by = c("doc" = "neccor"))   %>% mutate (key = paste0(ug_teste,doc_lanca)) %>% group_by(ug_teste, fonte,doc_lanca, cc, key) %>% summarise( pago = sum(pago))
+
+key_cred %>% count(doc_lanca) %>% filter (n>1)
+
+efetuado_vinc <- efetuados %>% filter (ano == "2019") %>% select(doc, fonte, fonte_cod, vinc, efetuado)
+
+
+key_vinc <- left_join (key_cred, efetuado_vinc, by = c("doc_lanca" = "doc"))
+
+(sum (efetuados$efetuado))
+
+(sum (key_cred$pago))
+
+(sum (key_pago$pago))
+
+(sum (key_vinc$efetuado))
 
 ```
 
 
 
 ```{r}
+
 
 
 
@@ -395,11 +490,11 @@ tt<- neccor$neccor
 ddcc<- merge (cc,dd, by = "cc")
 
 ddccor<-ddcc%>% filter (doc.y %in% neccor$neccor, doc_tipo.x != "NC" )
-(unique(ddcc$doc.x))
+unique(ddcc$doc.x)
 
 ddcc_nd<-ddcc%>% filter (doc.y %in% ddccor$doc.x, doc_tipo.x == "NC" )%>%
   select(doc.x)
-(unique(ddcc_nd$doc.x))
+unique(ddcc_nd$doc.x)
 
 nc_clientes <- c(unique(ddcc$doc.x),unique(ddcc_nd$doc.x))
 
@@ -408,5 +503,39 @@ final<-credito%>% filter (doc %in% nc_clientes,ano =="2019", ug_cliente != "")%>
   summarise(saldo = round(as.numeric(sum (credito)),2))
 
 
+```
+
+```{r}
+datatable(pago)
+```
+```{r}
+
+
+key_cred_2 <- key_cred %>% group_by(ug_teste) %>% summarise(pago = sum(pago))
+
+repasse_pf_2 <- repasse_pf %>% filter (ano == "2019") %>% group_by(ug_cliente) %>% summarise(repasse = sum(repasse))
+
+saldo <- left_join(repasse_pf_2, key_cred_2, by = c("ug_cliente"="ug_teste")) %>% mutate (repasse = -repasse, saldo = repasse - pago)
+
+```
+
+
+```{r}
+datatable(saldo)%>%
+                  formatRound("saldo",
+                      digits = 2,
+                      interval = 3,
+                      mark = ".",
+                      dec.mark = ",") %>% 
+ formatRound("pago",
+                      digits = 2,
+                      interval = 3,
+                      mark = ".",
+                      dec.mark = ",") %>% 
+   formatRound("repasse",
+                      digits = 2,
+                      interval = 3,
+                      mark = ".",
+                      dec.mark = ",")
 ```
 

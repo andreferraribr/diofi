@@ -1,0 +1,188 @@
+---
+title: "controle"
+# output: 
+#   flexdashboard::flex_dashboard:
+#     orientation: rows
+  
+
+# runtime: shiny
+---
+
+
+```{r setup, include=FALSE}
+options(scipen=999)
+options(digits=2)
+```
+
+
+```{r, message=FALSE}
+library(flexdashboard)
+library(readxl)
+library(ggplot2)
+library(stringr)
+library(plotly)
+library(DT)
+library(flexdashboard)
+library(knitr)
+library(shiny)
+library(shinyWidgets)
+library(lubridate)
+library(tidyverse)
+
+```
+
+
+
+```{r}
+
+credito <- read_excel("r_credito.xlsx")
+
+tg2r_credito <- read_csv("tg2r_credito.csv")
+
+colnames(credito)<-tg2r_credito$r_name 
+
+credito <- credito %>% select (-"vazio")
+
+pago <- read_excel("pago.xlsx")
+
+balancete <- read_excel("balancete.xlsx")
+
+colunas <- read_csv("colunas.csv")
+
+colnames(balancete)<-colunas$r 
+
+
+
+```
+
+```{r}
+datatable ((credito %>%   group_by(ugr, cc) %>% summarise(credito = round(sum(saldo), 2))),filter = 'top', options = list(pageLength = 5, autoWidth = TRUE))
+```
+
+
+BP
+=============================================
+
+Selecione o nivel
+```{r input$nivel}
+# criar filtro para selecionar a UF
+selectInput("nivel", label ="", 
+    choices = colnames(balancete), 
+    selected = "i_classe")
+```
+
+
+Selecione o item
+```{r input$item}
+# criar filtro para selecionar a UF
+selectInput("item", label ="", 
+    choices = NULL)
+```
+
+
+Row
+--------------------------------------------------------------------------
+
+
+### bp
+
+```{r}
+
+renderPlotly({
+bp <- balancete %>% filter (i_classe_cod %in% c(1,2)) %>% group_by(i_classe_cod,i_classe, iii_subgrupo) %>% summarise(saldo = sum(saldo))
+
+p <- ggplot(data = filter(bp, i_classe_cod %in% c(1,2) )) + 
+  geom_col(mapping = aes(x = i_classe, y = saldo, fill = iii_subgrupo))
+  
+ggplotly(p)%>% layout(showlegend = FALSE)
+
+})
+```
+
+```{r}
+bp <- balancete %>% filter (i_classe_cod %in% c(1,2)) %>% group_by(i_classe_cod,i_classe, iii_subgrupo) %>% summarise(saldo = sum(saldo))
+
+p <- ggplot(data = filter(bp, i_classe_cod %in% c(1,2) )) + 
+  geom_col(mapping = aes(x = i_classe, y = saldo, fill = iii_subgrupo))
+ggplotly(p)%>% layout(showlegend = FALSE)
+```
+
+
+### vp
+
+```{r}
+
+renderPlotly({
+bp <- balancete %>% filter (i_classe_cod %in% c(3,4)) %>% group_by(i_classe_cod,i_classe, ii_grupo) %>% summarise(saldo = as.integer( sum(saldo)))
+
+p <- ggplot(data = filter(bp, i_classe_cod %in% c(3,4) )) + 
+  geom_col(mapping = aes(x = i_classe, y = saldo, fill = ii_grupo))
+  
+ggplotly(p)%>% layout(showlegend = FALSE)
+
+})
+```
+
+
+
+### orc
+
+```{r}
+
+renderPlotly({
+bp <- balancete %>% filter (i_classe_cod %in% c(5,6)) %>% group_by(i_classe_cod,i_classe, ii_grupo) %>% summarise(saldo = as.integer( sum(saldo)))
+
+p <- ggplot(data = filter(bp, i_classe_cod %in% c(5,6) )) + 
+  geom_col(mapping = aes(x = i_classe, y = saldo, fill = ii_grupo))
+  
+ggplotly(p)%>% layout(showlegend = FALSE)
+
+})
+```
+
+
+
+### controle
+
+```{r}
+
+renderPlotly({
+bp <- balancete %>% filter (i_classe_cod %in% c(7,8)) %>% group_by(i_classe_cod,i_classe, conta) %>% summarise(saldo = sum(saldo))
+
+p <- ggplot(data = filter(bp, i_classe_cod %in% c(7,8) )) + 
+  geom_col(mapping = aes(x = i_classe, y = saldo, fill = conta))
+  
+ggplotly(p)%>% layout(showlegend = FALSE)
+
+})
+```
+
+
+
+Row
+--------------------------------------------------------------------------
+
+
+### tabela
+
+```{r}
+renderDT({ datatable(balancete %>% filter (i_classe_cod %in% c(1,2)) %>% group_by(i_classe_cod,i_classe, ii_grupo, iii_subgrupo) %>% summarise(saldo = sum(saldo)))%>%
+                  formatRound("saldo",
+                      digits = 2,
+                      interval = 3,
+                      mark = ".",
+                      dec.mark = ",")
+  
+})  
+```
+
+
+```{r}
+datatable(balancete %>% filter (i_classe_cod %in% c(1,2)) %>% group_by(i_classe_cod,i_classe, ii_grupo, iii_subgrupo) %>% summarise(saldo = sum(saldo)))%>%
+                  formatRound("saldo",
+                      digits = 2,
+                      interval = 3,
+                      mark = ".",
+                      dec.mark = ",")
+```
+

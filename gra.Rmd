@@ -1,0 +1,259 @@
+---
+title: "controle"
+output:
+  flexdashboard::flex_dashboard:
+    orientation: rows
+    source_code: https://github.com/andreferraribr/receitas
+    social: [ "twitter", "facebook", "menu" ]
+  
+
+runtime: shiny
+---
+
+
+```{r setup, include=FALSE}
+options(scipen=999)
+options(digits=2)
+```
+
+
+```{r, message=FALSE}
+library(flexdashboard)
+library(readxl)
+library(ggplot2)
+library(stringr)
+library(plotly)
+library(DT)
+library(flexdashboard)
+library(knitr)
+library(shiny)
+library(shinyWidgets)
+library(lubridate)
+library(tidyverse)
+library(tinytex)
+
+
+```
+
+
+
+```{r include=FALSE}
+
+credito <- read_excel("r_credito.xlsx")
+
+rateio_cota <- read_excel("rateio_cota.xlsx")
+
+tg2r_credito <- read_csv("tg2r_credito.csv")
+
+colnames(credito)<-tg2r_credito$r_name 
+
+credito <- credito %>% select (-"vazio")
+
+pago <- read_excel("pago.xlsx")
+
+balancete <- read_excel("balancete.xlsx")
+
+colunas <- read_csv("colunas.csv")
+
+colnames(balancete)<-colunas$r 
+
+
+
+```
+
+```{r}
+custos <- read_excel("r_custos.xlsx")
+
+tg2r_custos <- read_excel("tg2r_custos.xlsx")
+
+colnames(custos)<-tg2r_custos$r_name
+```
+
+Credito
+=============================================
+
+### CREDITO
+```{r}
+
+renderDT({
+datatable ((credito %>%   group_by(ugr, cc) %>% summarise(credito = round(sum(saldo), 2))),filter = 'top', options = list(pageLength = 25, autoWidth = TRUE))
+  
+  })
+```
+
+
+### CREDITO por UGR
+```{r}
+
+renderDT({
+datatable ((credito %>%   group_by(uo, ugr) %>% summarise(credito = round(sum(saldo), 2))),filter = 'top', options = list(pageLength = 25, autoWidth = TRUE))
+  
+  })
+```
+
+
+Custos
+=============================================
+
+### custos
+
+```{r}
+
+renderDT({
+datatable ((custos %>%   group_by(ug_icc, centro_custo) %>% summarise(custo = round(sum(custo), 2))),filter = 'top', options = list(pageLength = 5, autoWidth = TRUE))
+  
+})  
+```
+
+colunm
+------------------------------------
+
+### custos por ICC
+
+```{r}
+
+renderDT({
+datatable ((custos %>%   group_by(uo, ug_icc) %>% summarise(custo = round(sum(custo), 2))),filter = 'top', options = list(pageLength = 5, autoWidth = TRUE))
+  
+})  
+```
+
+
+Custos GRA
+=============================================
+
+###Custos GRA
+
+```{r}
+custos <- custos %>% mutate (mes = ymd (paste0(custos$mm_ano_cod,"01")))
+
+
+meses <-custos %>% group_by(mm_ano_cod, mm_ano) %>% summarise(n = n())
+
+
+
+gra <- c("S6SC002MCTI", "S6SC001ABIN", "S6SC001INPI", "S6SC002CGU", "S6SC003CGU", "S612SC001", "S612SC002", "S612SC003", "S672SC003") 
+
+rateio <- c("05027397000129", "05600954000159","08336783000190","10364152000127","78533312000158","82508433000117","82892282000143")
+
+meses_rateio <-custos %>% filter (centro_custo_cod %in% gra, favorecido_cod %in% rateio) %>%  group_by(mm_ano_cod, mm_ano) %>% summarise(n = n())
+
+custo_mensal_gra <- custos %>% filter (centro_custo_cod %in% gra) %>%  group_by(ndd, mm_ano_cod) %>% summarise(custo = sum(custo)) %>% pivot_wider( names_from = mm_ano_cod, values_from = custo)
+
+custo_mensal_rateio <- custos %>% filter (centro_custo_cod %in% gra, favorecido_cod %in% rateio) %>%  group_by(ndd,favorecido, mm_ano_cod) %>% summarise(custo = sum(custo)) %>% pivot_wider( names_from = mm_ano_cod, values_from = custo)
+
+
+  
+custo_mensal_centro <- custos %>% group_by(centro_custo_cod, mm_ano_cod) %>% summarise(custo = sum(custo)) %>% pivot_wider( names_from = mm_ano_cod, values_from = custo)
+ 
+
+names(custo_mensal_rateio)[names(custo_mensal_rateio) %in% meses$mm_ano_cod] <- meses_rateio$mm_ano
+
+# colnames(custo_mensal_rateio)[2:ncol(custo_mensal_rateio)] <- meses$mm_ano
+
+datatable((custo_mensal_gra) ,
+      extensions = 'Buttons',
+      options = list( 
+                  dom = "Blfrtip",
+                  buttons = 
+                    list("copy", list(
+                      extend = "collection",
+                      buttons = c("csv", "excel", "pdf"),
+                      text = "Download" ) ),
+                  lengthMenu = list( c(-1, 20, 50),
+                                     c( "tudo",20, 50)),
+                  pageLength = 20 ))
+
+
+
+
+```
+
+Row
+--------------------------------------------------------------------------
+
+### plot
+```{r}
+
+renderPlotly({
+  
+  plot_gra<-custos %>% filter (centro_custo_cod %in% gra) %>%  group_by(mes) %>% summarise(custo = (sum(custo)))
+  
+  gra<- ggplot( plot_gra, aes(  x= mes  , y=custo)) +
+    geom_line()
+  
+ggplotly(gra)  
+})
+
+```
+
+
+Rateio
+=============================================
+### rateio
+
+```{r}
+renderDT({
+datatable((custo_mensal_rateio) ,
+      extensions = 'Buttons',
+      options = list( 
+                  dom = "Blfrtip",
+                  buttons = 
+                    list("copy", list(
+                      extend = "collection",
+                      buttons = c("csv", "excel", "pdf"),
+                      text = "Download" ) ),
+                  lengthMenu = list( c(-1, 20, 50),
+                                     c( "tudo",20, 50)),
+                  pageLength = 20 ))%>% formatRound(
+  (3:length(custo_mensal_rateio)),
+  digits = 2,
+  interval = 3,
+  mark = ",",
+  dec.mark = getOption("OutDec")
+)
+})
+```
+
+
+balancete
+=============================================
+### balancete
+
+
+```{r}
+renderDT({
+  datatable(balancete %>% filter (i_classe_cod %in% c(1,2)) %>% group_by(i_classe_cod,i_classe, ii_grupo, iii_subgrupo) %>% summarise(saldo = sum(saldo)))%>%
+                  formatRound("saldo",
+                      digits = 2,
+                      interval = 3,
+                      mark = ".",
+                      dec.mark = ",")
+})  
+```
+
+
+
+```{r include=FALSE}
+custos %>% group_by(centro_custo_cod,centro_custo) %>% summarise(n = n())
+
+```
+
+
+
+```{r eval=FALSE, include=FALSE}
+bp <- balancete %>% filter (i_classe_cod %in% c(1,2)) %>% group_by(i_classe_cod,i_classe, iii_subgrupo) %>% summarise(saldo = sum(saldo))
+
+p <- ggplot(data = filter(bp, i_classe_cod %in% c(1,2) )) + 
+  geom_col(mapping = aes(x = i_classe, y = saldo, fill = iii_subgrupo))
+ggplotly(p)
+```
+
+
+```{r}
+rateio_final <- (cbind(custo_mensal_rateio[,1:2], custo_mensal_rateio[,3:length(custo_mensal_rateio)] * rateio_cota[,3:length(rateio_cota)] ))
+
+
+
+```
+
