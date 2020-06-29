@@ -3,7 +3,7 @@ title: "controle"
 output:
   flexdashboard::flex_dashboard:
     orientation: rows
-    source_code: https://github.com/andreferraribr/receitas
+    source_code: https://github.com/andreferraribr/diofi
     social: [ "twitter", "facebook", "menu" ]
   
 
@@ -24,124 +24,99 @@ library(ggplot2)
 library(stringr)
 library(plotly)
 library(DT)
-library(flexdashboard)
 library(knitr)
 library(shiny)
 library(shinyWidgets)
 library(lubridate)
 library(tidyverse)
-library(tinytex)
-library(reader)
+library(janitor)
+
 
 
 ```
 
 
 ```{r}
-dados = function(df, depara){
-  nome <- read_xlsx(df)
+'%!in%' <- Negate('%in%')
+```
+
+```{r}
+
+# funcao para importar dados e renomear variaveis
+
+dados = function(tg, depara){
+  # carregar planilha com dados do Tesouro Gerencial (tg)
+  df <- read_xlsx(tg)
+  # carregar planilha com o de_para dos nomes dos atributos do Tesouro Gerencial para nomes mais amigáveis para as variáveis. Por exemplo, de(Unidade Orçamentária Código) para(uo_cod)
   tg2r <- read_xlsx(depara)
-  colnames(nome)<-tg2r$r_name
-  return(nome)
+  # renomear as colunas da df fazendo o de_para
+  colnames(df)<-tg2r$r_name
+  return(df)
+}
+```
+
+```{r}
+tabela = function (df) {
+      datatable((df)%>%
+  adorn_totals("row") %>%
+  adorn_totals("col"),
+      filter = 'top',          
+      extensions = 'Buttons',
+      options = list( 
+                  dom = "Blfrtip",
+                  buttons = 
+                    list("copy", list(
+                      extend = "collection",
+                      buttons = c("csv", "excel", "pdf"),
+                      text = "Download" ) ),
+                  lengthMenu = list( c(-1, 20, 50),
+                                     c( "tudo",20, 50)),
+                  pageLength = 20 ))%>%
+  formatRound(
+  # formatar apenas as colunas numericas.
+  # Iniciar formatacao a partir da primeira coluna nao character [select_if(is.character))+1]
+    ((ncol(df %>% select_if(is.character))+1):(ncol(df )+1)),
+  digits = 2,
+  interval = 3,
+  mark = ",",
+  dec.mark = getOption("OutDec")
+)
 }
 ```
 
 
-
 ```{r include=FALSE}
 
-#  importar relatório gerado no Tesouro Gerencial
-credito <- read_excel("r_credito.xlsx")
+#  importar relatório gerado no Tesouro Gerencial com dados sobre o crédito disponível e renomear as colunas
+credito <- dados("r_credito.xlsx", "tg2r_credito.xlsx")
 
-# importar planilha com o de_para dos nomes dos atributos do Tesouro Gerencial para nomes mais amigáveis para as variáveis. Por exemplo, de(Unidade Orçamentária Código) para(uo_cod)
-tg2r_credito <- read_excel("tg2r_credito.xlsx")
 
-# renomear as colunas da df credito fazendo o de_para
-colnames(credito)<-tg2r_credito$r_name 
+# criar a variável ug_cliente para apurar os saldos entre a ug 170166 e a setorial 170013
+credito<- credito%>%
+  mutate ( ug_ug = if_else(ug_emit_cod %in% c("170166", "170013"),str_c(ug_emit_cod,favorecido_cod,ug_emit,favorecido),""))%>%
+  mutate (ug_cliente = str_replace(ug_ug, "SUPERINTENDENCIA DE ADMINISTRACAO DO MF/SC",""))%>%
+  mutate (ug_cliente = str_replace(ug_cliente, "170166",""))
+
 
 # excluir a coluna "vazio" (o Tesouro Gerencial gera uma coluna sem dados)
 credito <- credito %>% select (-"vazio")
 
-pago <- read_excel("pago.xlsx")
-
-balancete <- read_excel("balancete.xlsx")
-
-colunas <- read_csv("tg2r_balancete.xlsx")
-
-colnames(balancete)<-colunas$r 
-
 
 
 ```
 
-```{r}
-custos <- read_excel("r_custos.xlsx")
-
-tg2r_custos <- read_excel("tg2r_custos.xlsx")
-
-colnames(custos)<-tg2r_custos$r_name
-```
-
-Credito
-=============================================
-
-### CREDITO
-```{r}
-
-renderDT({
-datatable ((credito %>%   group_by(ugr, cc) %>% summarise(credito = round(sum(saldo), 2))),filter = 'top', options = list(pageLength = 25, autoWidth = TRUE))
-  
-  })
-```
-
-
-### CREDITO por UGR
-```{r}
-
-renderDT({
-datatable ((credito %>%   group_by(uo, ugr) %>% summarise(credito = round(sum(saldo), 2))),filter = 'top', options = list(pageLength = 25, autoWidth = TRUE))
-  
-  })
-```
-
-
-Custos
-=============================================
-
-### custos
 
 ```{r}
-
-renderDT({
-datatable ((custos %>%   group_by(ug_icc, centro_custo) %>% summarise(custo = round(sum(custo), 2))),filter = 'top', options = list(pageLength = 5, autoWidth = TRUE))
-  
-})  
-```
-
-colunm
-------------------------------------
-
-### custos por ICC
-
-```{r}
-
-renderDT({
-datatable ((custos %>%   group_by(uo, ug_icc, ugr, centro_custo, org) %>% summarise(custo = round(sum(custo), 2))),filter = 'top', options = list(pageLength = 5, autoWidth = TRUE))
-  
-})  
-```
+#  importar relatório gerado no Tesouro Gerencial com dados sobre o custos e renomear as colunas
+custos <- dados("r_custos.xlsx", "tg2r_custos.xlsx")
 
 
-Custos GRA
-=============================================
-
-###Custos GRA
-
-```{r}
-custos <- custos %>% mutate (mes = ymd (paste0(custos$mm_ano_cod,"01")))
+custos <- custos %>% mutate (
+  mes = ymd (paste0(custos$mm_ano_cod,"01")),
+  mes_nome = month(mes, label = TRUE))
 
 
-meses <-custos %>% group_by(mm_ano_cod, mm_ano) %>% summarise(n = n())
+
 
 custos <- custos %>% mutate(org = case_when(
   centro_custo_cod == "S6SC002MCTI" ~ "MCTIC",
@@ -176,7 +151,7 @@ custos <- custos %>% mutate(org_custo = case_when(
 
 
 
-custos <- custos %>% mutate(org_credito = case_when(
+custos <- custos %>% mutate(org_pago = case_when(
   uo_cod == "24101" ~ "MCTIC",
   uo_cod == "20118" ~ "ABIN",
   uo_cod == "25297" ~ "INPI",
@@ -192,43 +167,115 @@ gra <- c("S6SC002MCTI", "S6SC001ABIN", "S6SC001INPI", "S6SC003CGU", "S612SC001",
 
 rateio <- c("05027397000129", "05600954000159","08336783000190","10364152000127","78533312000158","82508433000117","82892282000143")
 
-meses_rateio <-custos %>% filter (centro_custo_cod %in% gra, favorecido_cod %in% rateio) %>%  group_by(mm_ano_cod, mm_ano) %>% summarise(n = n())
-
-custo_mensal_gra <- custos %>% filter (centro_custo_cod %in% gra) %>%  group_by(ndd, mm_ano_cod) %>% summarise(custo = sum(custo)) %>% pivot_wider( names_from = mm_ano_cod, values_from = custo)
-
-custo_mensal_rateio <- custos %>% filter (centro_custo_cod %in% gra, favorecido_cod %in% rateio) %>%  group_by(ndd,favorecido, mm_ano_cod) %>% summarise(custo = sum(custo)) %>% pivot_wider( names_from = mm_ano_cod, values_from = custo)
 
 
-(saldo_org <- custos %>% filter (centro_custo_cod %in% gra, favorecido_cod %in% rateio) %>%  group_by(org_custo) %>% summarise(custo = sum(custo)) )
+custo_mensal_gra <- custos %>% filter (centro_custo_cod %in% gra) %>%  group_by(ndd, mes_nome) %>% summarise(custo = sum(custo)) %>% pivot_wider( names_from = mes_nome, values_from = custo)
 
-(saldo_uo <- custos %>% filter (centro_custo_cod %in% gra, favorecido_cod %in% rateio) %>%  group_by(org_credito) %>% summarise(credito = sum(custo)) )
+custo_mensal_rateio <- custos %>% filter (centro_custo_cod %in% gra, favorecido_cod %in% rateio) %>%  group_by(ndd,favorecido, mes_nome) %>% summarise(custo = sum(custo)) %>% pivot_wider( names_from = mes_nome, values_from = custo)
 
-(saldo_custo <- full_join(saldo_org,saldo_uo, by = c ("org_custo" = "org_credito")) %>% mutate_all(~replace(., is.na(.), 0))%>% mutate(saldo = credito - custo))
+
+rateio_gra <- custos %>% filter (centro_custo_cod %in% gra, favorecido_cod %in% rateio) %>%  group_by(org , mes_nome) %>% summarise(custo = sum(custo)) %>% pivot_wider( names_from = mes_nome, values_from = custo)
+
+
+
+saldo_org <- custos %>% filter (centro_custo_cod %in% gra, favorecido_cod %in% rateio) %>%  group_by(org_custo) %>% summarise(custo = sum(custo)) 
+
+saldo_uo <- custos %>% filter (centro_custo_cod %in% gra, favorecido_cod %in% rateio) %>%  group_by(org_pago) %>% summarise(pago = sum(custo)) 
+
+saldo_custo <- full_join(saldo_org,saldo_uo, by = c ("org_custo" = "org_pago")) %>% mutate_all(~replace(., is.na(.), 0))%>% mutate(saldo = pago - custo)
   
-custo_mensal_centro <- custos %>% group_by(centro_custo_cod, mm_ano_cod) %>% summarise(custo = sum(custo)) %>% pivot_wider( names_from = mm_ano_cod, values_from = custo)
+custo_mensal_centro <- custos %>% group_by(centro_custo_cod, mes_nome) %>% summarise(custo = sum(custo)) %>% pivot_wider( names_from = mes_nome, values_from = custo)
  
 
-names(custo_mensal_rateio)[names(custo_mensal_rateio) %in% meses$mm_ano_cod] <- meses_rateio$mm_ano
 
-# colnames(custo_mensal_rateio)[2:ncol(custo_mensal_rateio)] <- meses$mm_ano
 
-datatable((custo_mensal_gra) ,
-      extensions = 'Buttons',
-      options = list( 
-                  dom = "Blfrtip",
-                  buttons = 
-                    list("copy", list(
-                      extend = "collection",
-                      buttons = c("csv", "excel", "pdf"),
-                      text = "Download" ) ),
-                  lengthMenu = list( c(-1, 20, 50),
-                                     c( "tudo",20, 50)),
-                  pageLength = 20 ))
 
 
 
 
 ```
+
+
+```{r}
+balancete <- dados ("balancete.xlsx", "tg2r_balancete.xlsx")
+
+orcado <- read_xlsx("orcado.xlsx")
+```
+
+
+
+Custos GRA
+=============================================
+
+### Custos GRA
+
+```{r}
+
+
+renderDT({
+tabela(custo_mensal_gra)
+})
+
+
+```
+
+
+
+Credito
+=============================================
+
+
+Row
+--------------------------------------------------------------------------
+
+### CREDITO
+```{r}
+
+renderDT({
+tabela (credito %>%   group_by(uo, ugr) %>% summarise(credito = sum(saldo)))
+  
+  })
+```
+
+
+
+
+```{r eval=FALSE, include=FALSE}
+
+renderDT({
+tabela (credito %>%   group_by(uo, ugr) %>% summarise(credito = sum(saldo)))
+  
+  })
+```
+
+
+Custos
+=============================================
+
+### custos
+
+```{r}
+
+renderDT({
+tabela(custos %>%   group_by(ug_icc, centro_custo) %>% summarise(custo = round(sum(custo), 2)))
+  
+})  
+```
+
+colunm
+------------------------------------
+
+### custos por ICC
+
+```{r}
+
+renderDT({
+tabela(custos %>%   group_by(uo, ug_icc, ugr, centro_custo, org) %>% summarise(custo = round(sum(custo), 2)))
+  
+})  
+```
+
+
 
 Row
 --------------------------------------------------------------------------
@@ -249,77 +296,123 @@ ggplotly(gra)
 ```
 
 
+
+
 Rateio
 =============================================
+Row
+--------------------------------------------------------------------------
+
 ### rateio
 
 ```{r}
 renderDT({
-datatable((custo_mensal_rateio) ,
-      extensions = 'Buttons',
-      options = list( 
-                  dom = "Blfrtip",
-                  buttons = 
-                    list("copy", list(
-                      extend = "collection",
-                      buttons = c("csv", "excel", "pdf"),
-                      text = "Download" ) ),
-                  lengthMenu = list( c(-1, 20, 50),
-                                     c( "tudo",20, 50)),
-                  pageLength = 20 ))%>% formatRound(
-  (3:length(custo_mensal_rateio)),
-  digits = 2,
-  interval = 3,
-  mark = ",",
-  dec.mark = getOption("OutDec")
-)
+tabela(custo_mensal_rateio) 
 })
 ```
 
+Row
+--------------------------------------------------------------------------
 
-balancete
-=============================================
-### balancete
-
+### org
 
 ```{r}
+# https://stackoverflow.com/questions/4946873/add-row-to-a-data-frame-with-total-sum-for-each-column
+
 renderDT({
-  datatable(balancete %>% filter (i_classe_cod %in% c(1,2)) %>% group_by(i_classe_cod,i_classe, ii_grupo, iii_subgrupo) %>% summarise(saldo = sum(saldo)))%>%
-                  formatRound("saldo",
-                      digits = 2,
-                      interval = 3,
-                      mark = ".",
-                      dec.mark = ",")
-})  
-```
-
-### gauge
-
-```{r}
-
-renderPlotly({
-fig <- plot_ly(
-  domain = list(x = c(0, 1), y = c(0, 1)),
-  value = 450,
-  title = list(text = "Speed"),
-  type = "indicator",
-  mode = "gauge+number",
-  # delta = list(reference = 380),
-  gauge = list(
-    axis =list(range = list(NULL, 500)),
-    # steps = list(
-    #   list(range = c(0, 250), color = "lightgray"),
-    #   list(range = c(250, 400), color = "gray")),
-    threshold = list(
-      line = list(color = "red", width = 4),
-      thickness = 0.75,
-      value = 490))) 
-fig <- fig %>%
-  layout(margin = list(l=20,r=30))
-
-ggplotly(fig)
+tabela(rateio_gra) 
+  
 })
 ```
+
+GRA
+=============================================
+Row {data-height=30}
+-----------------------------------------------------------------------
+### saldo orçamentário ajustado
+
+```{r}
+flexdashboard::renderValueBox({
+  
+    #  saldo custo
+    valor1 <-  saldo_custo %>% filter(org_custo == "GRA") %>% summarise(saldo = sum(saldo))
+    
+    # crédito disponível
+    valor2 <-  credito %>% filter(ugr_cod == "170166", startsWith(pi_cod, "S64"),startsWith(nd_cod, "33") ) %>% summarise(saldo = sum(saldo))
+    
+    # pago
+    valor4 <- custos %>% filter(ugr_cod == "170166", startsWith(pi_cod, "S64"),startsWith(ndd_cod, "33") ) %>% summarise(saldo = sum(custo))
+    
+    # crédito recebido
+    valor3 <-  credito %>% filter(ugr_cod == "170166", doc_tipo_cod == "NC", startsWith(pi_cod, "S64"),startsWith(nd_cod, "33"), startsWith(ug_cliente, "170013") ) %>% summarise(saldo = sum(saldo))    
+    
+    valor <- 680000-valor3+valor2-sum(orcado$projetado)+ saldo_custo %>% filter(org_custo == "GRA") %>% summarise(saldo = sum(pago))+ valor4
+    valueBox(
+    valor,
+    color = if_else (valor <= 0, "red" , "blue")
+    )
+  })
+```
+
+
+### saldo de custos
+
+```{r}
+flexdashboard::renderValueBox({
+  
+    valor <-  saldo_custo %>% filter(org_custo == "GRA") %>% summarise(saldo = sum(saldo))
+    valueBox(
+    valor,
+    color = if_else (valor <= 0, "red" , "blue")
+    )
+  })
+```
+
+
+### crédito disponível
+
+```{r}
+flexdashboard::renderValueBox({
+  
+    valor <-  credito %>% filter(ugr_cod == "170166", startsWith(pi_cod, "S64"),startsWith(nd_cod, "33") ) %>% summarise(saldo = sum(saldo))
+    valueBox(
+    valor,
+    color = if_else (valor <= 0, "red" , "blue")
+    )
+  })
+```
+
+
+### limite de saque
+
+```{r}
+flexdashboard::renderValueBox({
+  
+    valor <-  credito %>% filter(ugr_cod == "170166", startsWith(pi_cod, "S64"),startsWith(nd_cod, "33") ) %>% summarise(saldo = sum(saldo))
+    valueBox(
+    valor,
+    color = if_else (valor <= 0, "red" , "blue")
+    )
+  })
+```
+
+
+### financeiro a programar
+
+```{r}
+flexdashboard::renderValueBox({
+  
+    valor <-  credito %>% filter(ugr_cod == "170166", startsWith(pi_cod, "S64"),startsWith(nd_cod, "33") ) %>% summarise(saldo = sum(saldo))
+    valueBox(
+    valor,
+    color = if_else (valor <= 0, "red" , "blue")
+    )
+  })
+```
+
+
+Row
+--------------------------------------------------------------------------
 
 ### time
 
@@ -328,63 +421,42 @@ renderPlotly({
   # criar df_br para consolidar arrecadação mês a mês em todo o país.
   df_br<-custos %>% filter (centro_custo_cod %in% gra, favorecido_cod %in% rateio) %>% group_by(mes) %>% summarise(custo = sum(custo))
   
+  df_br <- full_join(df_br, orcado)
   
  historico<- ggplot( df_br, aes(  x= mes , y=cumsum(custo))) +
-    geom_area() +
+    geom_line() +
+    geom_line(aes(  x= mes , y=cumsum(projetado)), colour = "grey", linetype = "dashed") +
     geom_hline(yintercept=680000, colour = "red", linetype = "dashed") +
     theme_classic() +
     ylab("") +
     xlab("") +
-    # https://ggplot2.tidyverse.org/reference/scale_date.html
-    # apresentar os anos 2015, 2016 , 2017, 2018, 2019 e 2020 na escal do eixo X
-    # scale_x_date(date_breaks = "1 year", date_labels = "%Y")+ 
     theme(axis.text.x = element_text(size=8),
           axis.text.y = element_text(size=8))
   historico
 ggplotly(historico)  
 })
 ```
-```{r}
-
-df_br<-custos %>% filter (centro_custo_cod %in% gra, favorecido_cod %in% rateio) %>% group_by(mes) %>% summarise(custo = sum(custo))
-  
- historico<- ggplot( df_br, aes(  x= mes , y=cumsum(custo))) +
-    geom_line() +
-    geom_hline(yintercept=680000, colour = "red", linetype = "dashed") +
-    theme_classic() +
-    ylab("") +
-    xlab("") +
-    # https://ggplot2.tidyverse.org/reference/scale_date.html
-    # apresentar os anos 2015, 2016 , 2017, 2018, 2019 e 2020 na escal do eixo X
-    # scale_x_date(date_breaks = "1 year", date_labels = "%Y")+ 
-    theme(axis.text.x = element_text(size=8),
-          axis.text.y = element_text(size=8))
-  historico
-```
 
 
-```{r include=FALSE}
-custos %>% group_by(centro_custo_cod,centro_custo) %>% summarise(n = n())
-
-```
-
-
-
-```{r eval=FALSE, include=FALSE}
-bp <- balancete %>% filter (i_classe_cod %in% c(1,2)) %>% group_by(i_classe_cod,i_classe, iii_subgrupo) %>% summarise(saldo = sum(saldo))
-
-p <- ggplot(data = filter(bp, i_classe_cod %in% c(1,2) )) + 
-  geom_col(mapping = aes(x = i_classe, y = saldo, fill = iii_subgrupo))
-ggplotly(p)
-```
-
+Row
+---------------------------------------------------------
+### heat
 
 ```{r}
+renderPlotly({
+df_br<-custos %>% filter (centro_custo_cod %in% gra, favorecido_cod %in% rateio) %>% group_by(mes, ndd) %>% summarise(custo = sum(custo))
 
+df_br <- full_join(df_br, orcado)
 
-# rateio_final_drive<- write_csv(rateio_final,"rateio_final_drive.csv" )
-
+teste <- ggplot(df_br, aes(mes, ndd, fill= custo)) + 
+  geom_tile() +
+  scale_fill_gradient(low="grey", high="red")+
+  theme_classic()
+ggplotly(teste)
+})
 ```
+
+
 
 heat
 =============================================
@@ -403,4 +475,13 @@ ggplotly(teste)
 ```
 
 
+
+
+```{r eval=FALSE, include=FALSE}
+datatable(( custos %>% filter (centro_custo_cod %in% gra, favorecido_cod %in% rateio) %>%  group_by(doc_habil, mes) %>% summarise(q = n())) %>% filter(q == 7))
+
+np_audit <- custos %>% filter (centro_custo_cod %in% gra, favorecido_cod %in% rateio) %>%  group_by(doc_habil, mes) %>% summarise(q = n()) %>% filter(q == 7)
+
+audit <- custos %>% filter (doc_habil %in% np_audit$doc_habil)
+```
 
