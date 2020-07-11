@@ -146,10 +146,8 @@ credito<- credito%>%
 custos <- dados("r_custos.xlsx", "tg2r_custos.xlsx")
 
 
-custos <- custos %>% mutate (
-  mes = ymd (paste0(custos$mm_ano_cod,"01")),
-  # mes_nome = month(mes, label = TRUE ,locale = "pt_BR.UTF-8")) %>% 
-  mes_nome = month(mes, label = TRUE )) %>% 
+custos <- custos %>% 
+  mutate ( mes = ymd (paste0(custos$mm_ano_cod,"01")), mes_nome = month(mes, label = TRUE )) %>% 
   mutate (chave = paste0(favorecido, mm_ano_cod))
 
 
@@ -498,5 +496,29 @@ audit <- custos %>% filter (doc_habil %in% np_audit$doc_habil)
 ```
 
 ```{r}
+```
+
+CGU
+=============================================
+
+
+
+```{r}
+renderDT({
+tabela(custos %>% filter (centro_custo_cod %in% c("S6SC006CGU","S6SC003CGU", "S612SC006")) %>%  group_by( centro_custo ,favorecido,ndd, mes_nome) %>% summarise(custo = sum(custo)) %>% pivot_wider( names_from = mes_nome, values_from = custo) %>% mutate_all(~replace(., is.na(.), 0))%>%
+  adorn_totals("col"),"Total"
+) 
+})
+```
+```{r}
+tabela(custos %>%   group_by( centro_custo, ug_icc, ugr, uo) %>% summarise(custo = sum(custo)) ) 
+```
+
+```{r, rateio pfn}
+
+tabela(custos %>% filter (org == "PFN") %>%  group_by( favorecido,ndd_cod, mes_nome) %>% summarise(custo = sum(custo)) %>% pivot_wider( names_from = mes_nome, values_from = custo) %>% mutate_all(~replace(., is.na(.), 0))%>%
+  adorn_totals("col"),"Total"
+) 
+
 ```
 
