@@ -11,6 +11,7 @@ runtime: shiny
 ---
 
 
+
 ```{r setup, include=FALSE}
 options(scipen=999)
 options(digits=2)
@@ -35,6 +36,7 @@ library("microbenchmark")
 # library("ggplot2movies")
 library("profvis")
 # library("Rcpp")
+library("gmailr")
 
 
 
@@ -75,6 +77,7 @@ dados = function(tg, depara){
 # coluna = "Total" para totalizar columnwise
 tabela = function (df,coluna = NULL) {
       datatable((df)%>%
+  # "row" para o total aparecer na linha, ou seja, totalizar os valores de uma coluna
   adorn_totals("row") ,
       filter = 'top',          
       extensions = 'Buttons',
@@ -122,18 +125,6 @@ reais <- function(numero){
 credito <- dados("r_credito.xlsx", "tg2r_credito.xlsx")
 
 
-# criar a variável ug_cliente para apurar os saldos entre a ug 170166 e a setorial 170013
-
-```
-
-
-```{r mutate ug_cliente}
-credito<- credito%>%
-  mutate ( ug_ug = if_else(ug_emit_cod %in% c("170166", "170013"),str_c(ug_emit_cod,favorecido_cod,ug_emit,favorecido),""))%>%
-  mutate (ug_cliente = str_replace(ug_ug, "SUPERINTENDENCIA DE ADMINISTRACAO DO MF/SC",""))%>%
-  mutate (ug_cliente = str_replace(ug_cliente, "170166",""))
-
-
 ```
 
 
@@ -154,18 +145,22 @@ custos <- dados("r_custos.xlsx", "tg2r_custos.xlsx")
 
 
 ```
+
+
 ```{r mutate mes e chave}
 custos <- custos %>% 
   # criar variável mes no formato ymd
-  mutate ( mes = ymd (paste0(custos$mm_ano_cod,"01")), mes_nome = month(mes, label = TRUE )) %>% 
+  mutate ( 
+    # adicionar o dia 01 à variável mm_ano_cod
+    mes = ymd (paste0(custos$mm_ano_cod,"01")),
+    # obter o nome do mes
+    mes_nome = month(mes, label = TRUE )) %>% 
   # criar variável chave para servir de primary key nos joins de custo realizado, projetado e monitorado.
   mutate (chave = paste0(favorecido, mm_ano_cod))
 
 #https://stackoverflow.com/questions/43772996/r-calculate-month-end
 
 # day(custos$mes) <- days_in_month(custos$mes)
-
-
 
 
 ```
@@ -188,6 +183,7 @@ custos <- custos %>% mutate(org = case_when(
   centro_custo_cod == "S621SC003"   ~ "PFN",
   TRUE  ~ "outras orgs"))
 
+# criar variável para identificar custos associados ao imóvel da GRA (Nunes Machado)
 custos <- custos %>% mutate(imovel_custo = if_else(org == "outras orgs", "outras localidades", "Nunes Machado" ))
 
 # variável 'org_custo' para identificar a instituição responsável pelo custo
@@ -226,12 +222,7 @@ custos <- custos %>% mutate(org_pago = case_when(
 
 ```{r cnpj dos prestadores dos serviços compartilhados do imóvel da Nunes Machado - GRA}
 
-
 fornecerdor_nunes_machado <- c("05027397000129","05600954000159","08336783000190","10364152000127","78533312000158","82508433000117","82892282000143")
-
-
-
-
 
 ```
 
@@ -241,25 +232,41 @@ fornecerdor_nunes_machado <- c("05027397000129","05600954000159","08336783000190
 
 ```{r projetado realizado monitorado e fluxo}
 
-# previsão anual
+# previsão anual do custos (Os gestores devem preencher a tabela)
 projetado <- read_xlsx("projetado.xlsx") 
 
-projetado <- projetado %>% pivot_longer(starts_with("2020"),names_to = "mm_ano_cod", values_to = "custo") %>% mutate (mm_ano_cod = as.character(as.integer(mm_ano_cod)))%>% mutate (
-  mes = ymd (paste0(projetado$mm_ano_cod,"01")),
-  mes_nome = month(mes, label = TRUE)) %>% 
+# converter a planilha "projetado" para o mesmo formato da df "custos" 
+projetado <- projetado %>% 
+  #  (pivot_longer)
+  pivot_longer(starts_with("2020"),names_to = "mm_ano_cod", values_to = "custo") %>%
+  # criar as variáveis de tempo (lubridate)
+  mutate (mm_ano_cod = as.character(as.integer(mm_ano_cod)))
+
+projetado <- projetado %>%
+  mutate ( 
+    # criar variável "mes" adicionando o dia (dia 01) à variável mm_ano_cod
+    mes = ymd (paste0(projetado$mm_ano_cod,"01")),
+    mes_nome = month(mes, label = TRUE)) %>% 
+  # criar chave primária para mesclar os custos projetados com os custos realizados
   mutate (chave = paste0(favorecido, mm_ano_cod))
 
-projetado <- projetado %>% mutate (
-  mes = ymd (paste0(projetado$mm_ano_cod,"01")),
-  mes_nome = month(mes, label = TRUE))
-
 # custos incorridos e pagos
-realizado <- custos %>% filter ( org_custo == "GRA") %>% group_by(favorecido, favorecido_cod, mm_ano_cod, mes, mes_nome, chave) %>% summarise(custo = sum (custo))%>% mutate_all(~replace(., is.na(.), 0))
+realizado <- custos %>% 
+  # filtrar custo de responsabilidade da GRA
+  filter ( org_custo == "GRA") %>%
+  # group_by e summarise para deixar no mesmo formato da df "projetado"
+  group_by(favorecido, favorecido_cod, mm_ano_cod, mes, mes_nome, chave) %>% 
+  summarise(custo = sum (custo))%>% 
+  #  alterar NA por 0
+  mutate_all(~replace(., is.na(.), 0))
 
 # custos não incorridos a pagar
+# monitorado é a diferença de conjutos entre projetado (custos projetados) e realizado (custos incorridos e pagos). O objetivo é manter a projeção apenas dos custos a serem pagos. Por exemplo, se já foram pagos os serviços de vigilância dos meses de janeiro e feveriro, o monitorado trará a projeção para março em diante.
+# o anti_join será feito pela chave (cnpj+mm_ano_cod)
 monitorado <- na.omit(anti_join(projetado, realizado, by = "chave") ) 
 
-# custo incorridos e pagos + custos não incorridos a pagar
+#  monitorado                    + realizado
+#  custos não incorridos a pagar + custo incorridos e pagos
 fluxo <- na.omit( rbind(monitorado, realizado))
 ```
 
@@ -538,12 +545,6 @@ tabela (credito %>% filter (ptres == "171524", startsWith (pi_cod, "RAT")) %>%  
   })
 ```
 
-```{r}
-datatable(custos %>% filter (favorecido_cod =="10364152000127", uo_cod == "25101", favorecido_cod =="10364152000127") %>% select(favorecido, favorecido_cod, centro_custo, mes_nome, custo, org, org_custo, org_pago))
-```
-```{r}
-renderDT({
-datatable(custos %>% filter (org_custo == "GRA", mes_nome == "Feb", favorecido_cod == "10364152000127") %>%  group_by( doc_habil, org, org_custo, org_pago, custo, centro_custo) %>% summarise(custo = sum(custo)) )
-})
-```
+
+
 
