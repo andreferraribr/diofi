@@ -32,11 +32,11 @@ library(shinyWidgets)
 library(lubridate)
 library(tidyverse)
 library(janitor)
-library("microbenchmark")
+# library("microbenchmark")
 # library("ggplot2movies")
-library("profvis")
+# library("profvis")
 # library("Rcpp")
-library("gmailr")
+
 
 
 
@@ -91,7 +91,7 @@ tabela = function (df,coluna = NULL) {
                       text = "Download" ) ),
                   lengthMenu = list( c(-1, 5, 10,20),
                                      c( "tudo",5, 10, 20)),
-                  pageLength = 10 )
+                  pageLength = -1 )
       )%>%
   formatRound(
   # formatar apenas as colunas numericas.
@@ -129,11 +129,13 @@ credito <- dados("r_credito.xlsx", "tg2r_credito.xlsx")
 
 
 ```{r importar saldo dos limites}
-# limite <- dados("r_limite.xlsx", "tg2r_limite.xlsx")
+limite <- dados("r_limite.xlsx", "tg2r_limite.xlsx")
+
+
 ```
 
 ```{r importar saldo dos repasses a programas}
-# repasse <- dados("r_repasse.xlsx", "tg2r_repasse.xlsx")
+ repasse <- dados("r_repasse.xlsx", "tg2r_repasse.xlsx")
 ```
 
 
@@ -184,10 +186,11 @@ custos <- custos %>% mutate(org = case_when(
   TRUE  ~ "outras orgs"))
 
 # criar variável para identificar custos associados ao imóvel da GRA (Nunes Machado)
-custos <- custos %>% mutate(imovel_custo = if_else(org == "outras orgs", "outras localidades", "Nunes Machado" ))
+custos <- custos %>% mutate(imovel_custo = if_else(org == "outras orgs", centro_custo, "Nunes Machado" ))
 
 # variável 'org_custo' para identificar a instituição responsável pelo custo
-# pelas regras atuais a GRA é responsável pelos custos da SPU
+# pelas regras atuais a GRA é responsável pelos custos da SPU (mudou o entendimento em julho/2020)
+# agora a SPU é responsável pelo seu próprio custo
 custos <- custos %>% mutate(org_custo = case_when(
   centro_custo_cod == "S6SC002MCTI" ~ "MCTIC",
   centro_custo_cod == "S6SC001ABIN" ~ "ABIN",
@@ -196,7 +199,7 @@ custos <- custos %>% mutate(org_custo = case_when(
   centro_custo_cod == "S612SC001"   ~ "GRA",
   centro_custo_cod == "S612SC002"   ~ "GRA",
   centro_custo_cod == "S612SC003"   ~ "GRA",
-  centro_custo_cod == "S672SC003"   ~ "GRA",
+  centro_custo_cod == "S672SC003"   ~ "SPU",
   centro_custo_cod == "S621SC003"   ~ "PFN",
   TRUE  ~ "outras orgs custo" ))
 
@@ -210,7 +213,9 @@ custos <- custos %>% mutate(org_pago = case_when(
   uo_cod == "20118" ~ "ABIN",
   uo_cod == "25297" ~ "INPI",
   uo_cod == "37101" ~ "CGU",
+  # ugr_cod != "170173" para capturar custos de outras UGRs (área de TI, repadap...)
   uo_cod == "25101" & ugr_cod != "170173" ~ "GRA",
+  uo_cod == "25101" & ugr_cod == "170173" ~ "SPU",
   uo_cod == "25104" ~ "PFN",
   TRUE  ~ "outras uos"  ))
 
@@ -291,7 +296,7 @@ Row {data-height=20}
 ```{r}
 
 
-sliderInput(inputId = "limite", label = "limite", min= 400000, max = 750000, value = 680000, step = NULL, round = FALSE,
+sliderInput(inputId = "limite", label = "limite", min= 400000, max = 750000, value = 612000, step = NULL, round = FALSE,
   format = NULL, locale = NULL, ticks = TRUE, animate = FALSE,
   width = NULL, sep = ",", pre = NULL, post = NULL, timeFormat = NULL,
   timezone = NULL, dragRange = TRUE)
@@ -438,7 +443,7 @@ tabela (saldo_custo)
 ```{r}
 
 renderDT({
-tabela (credito %>%  filter(ugr_cod == "170166") %>% group_by(nd_cod, pi) %>% summarise(credito = sum(saldo)))
+tabela (credito %>%  filter(ugr_cod == "170166") %>% group_by(nd_cod, pi, pi_cod) %>% summarise(credito = sum(saldo)))
   
   })
 ```
@@ -531,20 +536,53 @@ tabela(custos %>% filter (org == "PFN") %>%  group_by( favorecido,ndd_cod, mes_n
 
 
 ```{r custos pfn, eval=FALSE, include=FALSE}
-tabela(custos %>% filter (org == "PFN") %>%  group_by( favorecido,ndd_cod, mes_nome, ne, doc_habil) %>% summarise(custo = sum(custo)) 
-) 
+tabela(custos %>% filter (org == "PFN", startsWith (pi_cod, "RAT")) %>%  group_by( favorecido,ndd_cod, mes_nome, ne, doc_habil) %>% summarise(custo = sum(custo)) ) 
 ```
 
 Row
 --------------------------------------------------------------------------
 
-```{r, credito rateio}
+```{r}
 renderDT({
-tabela (credito %>% filter (ptres == "171524", startsWith (pi_cod, "RAT")) %>%  group_by(nd_cod, pi_cod,pi) %>% summarise(credito = sum(saldo)))
+tabela (credito %>% filter (ptres == "171524", startsWith (pi_cod, "RAT")) %>%  group_by(pi_cod,pi, nd_cod) %>% summarise(credito = sum(saldo)))
+  
+  })
+```
+Row
+--------------------------------------------------------------------------
+
+
+```{r}
+renderDT({
+tabela (custos %>% filter (uo_cod == "25104", startsWith (pi_cod, "RAT")) %>%  group_by(pi_cod,pi ,ndd_cod) %>% summarise(custo = sum(custo)))
   
   })
 ```
 
+
+```{r eval=FALSE, include=FALSE}
+tabela(custos %>% filter (uo_cod == "25104", mes_nome %in% c("Mar", "Apr", "May")) %>%  group_by(ug_icc   , ndd  ) %>% summarise(custo = 4*(sum(custo))) %>% pivot_wider( names_from = ug_icc, values_from = custo) %>% mutate_all(~replace(., is.na(.), 0))%>%
+  adorn_totals("col"),"Total"
+) 
+```
+```{r eval=FALSE, include=FALSE}
+pfn <-  as.data.frame((custos %>% filter (uo_cod == "25104", mes_nome %in% c("Mar", "Apr", "May")) %>%  group_by(ug_icc   , ndd  ) %>% summarise(custo = 4*(sum(custo))) %>% pivot_wider( names_from = ug_icc, values_from = custo) %>% mutate_all(~replace(., is.na(.), 0))
+) )
+
+trab <-  as.data.frame((custos %>% filter (uo_cod == "25915", mes_nome %in% c("Mar", "Apr", "May")) %>%  group_by(uo  , ndd  ) %>% summarise(custo = 4*(sum(custo))) %>% pivot_wider( names_from = uo, values_from = custo) %>% mutate_all(~replace(., is.na(.), 0))
+) )
+
+spu_cgu <-  as.data.frame((custos %>% filter (  imovel_custo %in% c("ADM E LOG-R.ILHEUS FLORIANOPOLIS-SEDD/SPU","ADM E LOG-R. CONS. MAFRA, FLORIANOPOLIS-CGU"), mes_nome %in% c("Mar", "Apr", "May")) %>%  group_by(imovel_custo  , ndd  ) %>% summarise(custo = 4*(sum(custo))) %>% pivot_wider( names_from = imovel_custo, values_from = custo) %>% mutate_all(~replace(., is.na(.), 0))
+) )
+
+
+
+spu_pfn <- full_join(pfn,spu_cgu)
+
+todos <- full_join(spu_pfn,trab)
+
+tabela(todos)
+```
 
 
 
