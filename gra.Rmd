@@ -15,8 +15,12 @@ runtime: shiny
 ```{r setup, include=FALSE}
 options(scipen=999)
 options(digits=2)
+options (LC_NUMERIC="pt_BR.UTF-8")
+
 
 ```
+
+
 
 
 ```{r libraries,  message=FALSE}
@@ -32,6 +36,9 @@ library(shinyWidgets)
 library(lubridate)
 library(tidyverse)
 library(janitor)
+library(googledrive)
+library(gargle)
+library(gsheet)
 # library("microbenchmark")
 # library("ggplot2movies")
 # library("profvis")
@@ -44,6 +51,36 @@ library(janitor)
 
 ```{r}
 # profvis({  
+```
+
+
+```{r eval=FALSE, include=FALSE}
+
+
+# https://stackoverflow.com/questions/22873602/importing-data-into-r-from-google-spreadsheet
+
+#  https://github.com/maxconway/gsheet
+options(gargle_oauth_email = TRUE)
+
+
+options(gargle_oauth_email = "tesouro2r@gmail.com")
+
+drive_auth(email = TRUE)
+
+drive_auth(email = "tesouro2r@gmail.com")
+
+drive_download("~/Attachments/r_custos.xlsx",
+               overwrite = TRUE)
+
+drive_download("~/Attachments/r_credito_2.xlsx",
+               overwrite = TRUE)
+
+drive_download("~/Attachments/r_limite.xlsx",
+               overwrite = TRUE)
+
+
+drive_download("~/Attachments/r_repasse.xlsx",
+               overwrite = TRUE)
 ```
 
 
@@ -119,6 +156,12 @@ reais <- function(numero){
 ```
 
 
+
+
+
+
+
+
 ```{r importar saldo dos creditos, include=FALSE}
 
 #  importar relatório gerado no Tesouro Gerencial com dados sobre o crédito disponível e renomear as colunas
@@ -156,7 +199,7 @@ custos <- custos %>%
     # adicionar o dia 01 à variável mm_ano_cod
     mes = ymd (paste0(custos$mm_ano_cod,"01")),
     # obter o nome do mes
-    mes_nome = month(mes, label = TRUE )) %>% 
+    mes_nome = month(mes, label = TRUE,  locale = "pt_BR.UTF-8" )) %>% 
   # criar variável chave para servir de primary key nos joins de custo realizado, projetado e monitorado.
   mutate (chave = paste0(favorecido, mm_ano_cod))
 
@@ -251,7 +294,8 @@ projetado <- projetado %>%
   mutate ( 
     # criar variável "mes" adicionando o dia (dia 01) à variável mm_ano_cod
     mes = ymd (paste0(projetado$mm_ano_cod,"01")),
-    mes_nome = month(mes, label = TRUE)) %>% 
+    mes_nome = month(mes, label = TRUE, 
+  locale = "pt_BR.UTF-8")) %>% 
   # criar chave primária para mesclar os custos projetados com os custos realizados
   mutate (chave = paste0(favorecido, mm_ano_cod))
 
@@ -384,7 +428,8 @@ renderPlotly({
                 color = if_else(input$limite> sum(fluxo$custo),"blue","red")) +
    # https://mariano.eng.br/erro-cannot-set-lc-all-to-default-locale/
    # https://stackoverflow.com/questions/43099990/r-lubridate-weekdays-in-local-language
-    annotate("text", label = paste0 ("custos pagos até ", month(max(realizado$mes), label = TRUE, abbr = FALSE),": ", reais (sum(realizado$custo))),
+    annotate("text", label = paste0 ("custos pagos até ", month(max(realizado$mes), label = TRUE, abbr = FALSE, 
+  locale = "pt_BR.UTF-8"),": ", reais (sum(realizado$custo))),
              x = max(realizado$mes)+ 30, 
              y = sum(realizado$custo) + 10000, size = 4,
              colour = "black")+   
@@ -443,7 +488,7 @@ tabela (saldo_custo)
 ```{r}
 
 renderDT({
-tabela (credito %>%  filter(ugr_cod == "170166") %>% group_by(nd_cod, pi, pi_cod) %>% summarise(credito = sum(saldo)))
+tabela (credito %>%  filter(ugr_cod %in% c("170166","170475")) %>% group_by(nd_cod, pi, pi_cod) %>% summarise(credito = sum(saldo)))
   
   })
 ```
@@ -584,5 +629,24 @@ todos <- full_join(spu_pfn,trab)
 tabela(todos)
 ```
 
+Financeiro
+=============================================
+
+Row
+--------------------------------------------------------------------------
+
+### Repasse
+
+```{r}
+tabela(repasse %>% group_by( cc, fonte_deta) %>% summarise(saldo = sum(saldo)))
+```
+Row
+--------------------------------------------------------------------------
+
+### Limite
+
+```{r}
+tabela(limite %>% group_by( cc, fonte) %>% summarise(saldo = sum(saldo)))
+```
 
 
