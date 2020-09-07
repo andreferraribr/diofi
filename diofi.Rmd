@@ -59,7 +59,7 @@ Vamos iniciar importando os dados:
 # Item de Informação: Crédito Disponível (19)
 credito <- read_excel("cred.xlsx")
 
-colnames(credito)<-c("ano","org_uo_cod", "org_uo", "uo_cod", "uo", "ugr_cod", "ugr", "cc", "PTRES", "nd_cod", "nd", "fonte_cod", "fonte","pi_cod","pi", "ug_emit_cod", "ug_emit", "fav_cod", "fav", "fav_tipo_cod", "fav_tipo", "data_emi", "doc_tipo", "ug_lanca", "data_lan", "hora_acesso", "doc", "obs", "credito")
+colnames(credito)<-c("ano","org_uo_cod", "org_uo", "uo_cod", "uo", "ugr_cod", "ugr", "cc", "PTRES", "nd_cod", "nd", "fonte_cod", "fonte","pi_cod","pi", "ug_emit_cod", "ug_emit", "fav_cod", "fav", "fav_tipo_cod", "fav_tipo", "data_emi", "doc_tipo_cod", "ug_lanca", "data_lan", "hora_acesso", "doc", "obs", "credito")
 
 cc_credito <- credito %>% filter (ano == "2019") %>% group_by(cc) %>% summarise(credito = sum(credito))
 
@@ -229,7 +229,7 @@ Identificar os clientes
 
 repasse_nc <- repasse %>%
   # somente nota de crédito
-  filter(doc_tipo == "NC")%>%
+  filter(doc_tipo_cod == "NC")%>%
   # somente se favorecido for UG concatenar código e nome da ug emitente e da ug favorecida
   # a movimentação de crédito ocorre tanto do cliente para a GRA quanto da GRA para o cliente
   mutate ( ug_ug = if_else(fav_tipo_cod == "UG",str_c(ug_emit_cod,fav_cod,ug_emit,fav),""))%>%
@@ -239,7 +239,7 @@ repasse_nc <- repasse %>%
 
 repasse_pf <- repasse %>%
   # somente nota de crédito
-  filter(doc_tipo == "PF")%>%
+  filter(doc_tipo_cod == "PF")%>%
   # somente se favorecido for UG concatenar código e nome da ug emitente e da ug favorecida
   # a movimentação de crédito ocorre tanto do cliente para a GRA quanto da GRA para o cliente
   mutate ( ug_ug = if_else(fav_tipo_cod == "UG",str_c(ug_emit_cod,fav_cod,ug_emit,fav),""))%>%
@@ -250,14 +250,14 @@ repasse_pf <- repasse %>%
 
  # mesma rotina do repasse
 credito_nc <- credito %>%
-  filter(doc_tipo == "NC")%>%
+  filter(doc_tipo_cod == "NC")%>%
   mutate ( ug_ug = if_else(fav_tipo_cod == "UG",str_c(ug_emit_cod,fav_cod,ug_emit,fav),""))%>%
   mutate (ug_cliente = str_replace(ug_ug, "SUPERINTENDENCIA DE ADMINISTRACAO DO MF/SC",""))%>%
   mutate (ug_cliente = str_replace(ug_cliente, "170166",""))
 
  # mesma rotina do repasse, apenas filtrar por "PF"
 limite_pf <- limite %>%
-  filter(doc_tipo == "PF")%>%
+  filter(doc_tipo_cod == "PF")%>%
   mutate ( ug_ug = if_else(fav_tipo_cod == "UG",str_c(ug_emit_cod,fav_cod,ug_emit,fav),""))%>%
   mutate (ug_cliente = str_replace(ug_ug, "SUPERINTENDENCIA DE ADMINISTRACAO DO MF/SC",""))%>%
   mutate (ug_cliente = str_replace(ug_cliente, "170166",""))
@@ -308,7 +308,7 @@ pago_ne<- pago%>%
 
 
 credito_ne<- credito%>%
-  filter(doc_tipo == "NE")%>%
+  filter(doc_tipo_cod == "NE")%>%
   group_by(doc)%>%
   summarise(saldo = round(sum (credito),2))
 
@@ -357,7 +357,7 @@ modelo<- list(modelo_repasse, modelo_credito, modelo_limite, modelo_pago)
 ```{r new}
 cliente_repasse <- repasse_nc %>% group_by(ug_cliente, fonte, fonte_cod) %>% summarize(repasse = sum (repasse))
 
-cliente_ptres <- credito %>% filter (ug_teste != "", ug_emit_cod != 170166) %>% group_by(ug_teste, PTRES) %>% filter (doc_tipo == "NC") %>% summarise(credito = sum(credito))
+cliente_ptres <- credito %>% filter (ug_teste != "", ug_emit_cod != 170166) %>% group_by(ug_teste, PTRES) %>% filter (doc_tipo_cod == "NC") %>% summarise(credito = sum(credito))
 
 pago_ptres <- pago %>% filter(doc_origem_tipo == "OB") %>% group_by(PTRES, doc_lanca) %>%  summarise(pago = sum(pago))
 
@@ -426,15 +426,15 @@ key_vinc <- left_join (key_cred, efetuado_vinc, by = c("doc_lanca" = "doc"))
 
 ## detaorc
 cc<-credito%>%
-  filter(doc_tipo != "NC" , doc_tipo != "NE", ano == "2019", credito > 0)%>%
-  select(ugr, cc, doc_tipo, ug_emit, credito, doc)%>%
+  filter(doc_tipo_cod != "NC" , doc_tipo_cod != "NE", ano == "2019", credito > 0)%>%
+  select(ugr, cc, doc_tipo_cod, ug_emit, credito, doc)%>%
   group_by(doc, cc )%>%
   summarise(saldo = sum (credito))
 
 
 dd<-credito%>%
-  filter(doc_tipo != "NC" , doc_tipo != "NE", ano == "2019", credito < 0)%>%
-  select(ugr, cc, doc_tipo, ug_emit, credito, doc)%>%
+  filter(doc_tipo_cod != "NC" , doc_tipo_cod != "NE", ano == "2019", credito < 0)%>%
+  select(ugr, cc, doc_tipo_cod, ug_emit, credito, doc)%>%
   group_by(doc, cc )%>%
   summarise(saldo = sum (credito))
   
@@ -448,15 +448,15 @@ ddcc<- merge (cc,dd, by = "doc")
 
 
 cc<-credito%>%
-  filter(doc_tipo != "NC" , doc_tipo != "NE", ano == "2019", credito > 0)%>%
-  select(ugr, cc, doc_tipo, ug_emit, credito, doc)%>%
+  filter(doc_tipo_cod != "NC" , doc_tipo_cod != "NE", ano == "2019", credito > 0)%>%
+  select(ugr, cc, doc_tipo_cod, ug_emit, credito, doc)%>%
   group_by(doc )%>%
   summarise(saldo = sum (credito))
 
 
 dd<-credito%>%
-  filter(doc_tipo != "NC" , doc_tipo != "NE", ano == "2019", credito < 0)%>%
-  select(ugr, cc, doc_tipo, ug_emit, credito, doc)%>%
+  filter(doc_tipo_cod != "NC" , doc_tipo_cod != "NE", ano == "2019", credito < 0)%>%
+  select(ugr, cc, doc_tipo_cod, ug_emit, credito, doc)%>%
   group_by(doc )%>%
   summarise(saldo = sum (credito))
   
@@ -473,15 +473,15 @@ ddcc<- merge (cc,dd, by = "doc")
 ```{r}
 cc<-credito%>%
   filter(credito > 0, ano == "2019")%>%
-  select(cc, doc_tipo, ug_emit, credito, doc)%>%
-  group_by(doc, cc , doc_tipo)%>%
+  select(cc, doc_tipo_cod, ug_emit, credito, doc)%>%
+  group_by(doc, cc , doc_tipo_cod)%>%
   summarise(saldo = sum (credito))
 
 
 dd<-credito%>%
   filter( credito < 0, ano == "2019")%>%
-  select(ugr, cc, doc_tipo, ug_emit, credito, doc)%>%
-  group_by(cc, doc, doc_tipo )%>%
+  select(ugr, cc, doc_tipo_cod, ug_emit, credito, doc)%>%
+  group_by(cc, doc, doc_tipo_cod )%>%
   summarise(saldo = sum (credito))
   
 
@@ -489,10 +489,10 @@ tt<- neccor$neccor
 
 ddcc<- merge (cc,dd, by = "cc")
 
-ddccor<-ddcc%>% filter (doc.y %in% neccor$neccor, doc_tipo.x != "NC" )
+ddccor<-ddcc%>% filter (doc.y %in% neccor$neccor, doc_tipo_cod.x != "NC" )
 unique(ddcc$doc.x)
 
-ddcc_nd<-ddcc%>% filter (doc.y %in% ddccor$doc.x, doc_tipo.x == "NC" )%>%
+ddcc_nd<-ddcc%>% filter (doc.y %in% ddccor$doc.x, doc_tipo_cod.x == "NC" )%>%
   select(doc.x)
 unique(ddcc_nd$doc.x)
 
