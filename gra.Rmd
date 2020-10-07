@@ -142,6 +142,39 @@ tabela = function (df,coluna = NULL) {
   dec.mark = getOption("OutDec")
 )
 }
+
+
+
+tabela_reais = function (df,coluna = NULL) {
+      datatable((df)%>%
+  # "row" para o total aparecer na linha, ou seja, totalizar os valores de uma coluna
+  adorn_totals("row") ,
+      filter = 'top',          
+      extensions = 'Buttons',
+      options = list( 
+                  # order = list (df[(length(df))], 'desc'),
+                  dom = "Blfrtip",
+                  buttons = 
+                    list("copy", list(
+                      extend = "collection",
+                      buttons = c("csv", "excel", "pdf"),
+                      text = "Download" ) ),
+                  lengthMenu = list( c(-1, 5, 10,20),
+                                     c( "tudo",5, 10, 20)),
+                  pageLength = -1 )
+      )%>%
+  formatRound(
+  # formatar apenas as colunas numericas.
+  # sapply para identificar as colunas numericas e combinar com o parametro COLUNA
+    # ((ncol(df %>% select_if(is.character))+1):(ncol(df )+1)),
+    # http://datamining.togaware.com/survivor/Remove_Non_Numeric.html
+    (c(colnames(df[,sapply(df, is.numeric)]), coluna)),
+  digits = 2,
+  interval = 3,
+  mark = ".",
+  dec.mark = ","
+)
+}
 ```
 
 
@@ -177,10 +210,13 @@ limite <- dados("~/Dropbox/r_limite.xlsx", "~/Dropbox/tg2r_financeiro.xlsx")
 
 ```
 
-```{r importar saldo dos repasses a programas}
+```{r importar saldo dos repasses a programar}
  repasse <- dados("~/Dropbox/r_repasse.xlsx", "~/Dropbox/tg2r_financeiro.xlsx")
 ```
 
+```{r importa etapas da execução orçamentária}
+ etapas <- dados("~/Dropbox/r_etapas.xlsx", "~/Dropbox/tg2r_etapas.xlsx")
+```
 
 
 ```{r importar custos }
@@ -409,9 +445,9 @@ tabela(custos %>% filter (org_custo == "GRA") %>%  group_by(fav, mes_nome) %>% s
 ```
 
 
-### projeção
 
-```{r}
+
+```{r eval=FALSE, include=FALSE}
 renderPlotly({
   # criar df_br para consolidar custo mês a mês.
  df_br<-fluxo %>% group_by(mes) %>% summarise(custo = sum(custo))
@@ -627,6 +663,25 @@ todos <- full_join(spu_pfn,trab)
 
 tabela(todos)
 ```
+
+
+
+Fluxo
+=============================================
+
+Row
+--------------------------------------------------------------------------
+
+### Etapas
+
+```{r}
+
+tabela(etapas %>% group_by( uo_cod, ugr, fonte_det_cod, pi, nd_cod, item) %>% summarise(saldo = sum(saldo)) %>%  pivot_wider( names_from = item, values_from = saldo))
+
+
+```
+
+
 
 Financeiro
 =============================================
