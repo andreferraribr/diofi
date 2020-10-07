@@ -199,9 +199,9 @@ custos <- custos %>%
     # adicionar o dia 01 à variável mm_ano_cod
     mes = ymd (paste0(custos$mm_ano_cod,"01")),
     # obter o nome do mes
-    mes_nome = month(mes, label = TRUE,  locale = "pt_BR.UTF-8" )) %>% 
+    mes_nome = month(mes, label = TRUE)) %>% 
   # criar variável chave para servir de primary key nos joins de custo realizado, projetado e monitorado.
-  mutate (chave = paste0(favorecido, mm_ano_cod))
+  mutate (chave = paste0(fav, mm_ano_cod))
 
 #https://stackoverflow.com/questions/43772996/r-calculate-month-end
 
@@ -281,7 +281,7 @@ fornecerdor_nunes_machado <- c("05027397000129","05600954000159","08336783000190
 ```{r projetado realizado monitorado e fluxo}
 
 # previsão anual do custos (Os gestores devem preencher a tabela)
-projetado <- read_xlsx("projetado.xlsx") 
+projetado <- read_xlsx("~/Dropbox/projetado.xlsx") 
 
 # converter a planilha "projetado" para o mesmo formato da df "custos" 
 projetado <- projetado %>% 
@@ -294,17 +294,16 @@ projetado <- projetado %>%
   mutate ( 
     # criar variável "mes" adicionando o dia (dia 01) à variável mm_ano_cod
     mes = ymd (paste0(projetado$mm_ano_cod,"01")),
-    mes_nome = month(mes, label = TRUE, 
-  locale = "pt_BR.UTF-8")) %>% 
+    mes_nome = month(mes, label = TRUE)) %>% 
   # criar chave primária para mesclar os custos projetados com os custos realizados
-  mutate (chave = paste0(favorecido, mm_ano_cod))
+  mutate (chave = paste0(fav, mm_ano_cod))
 
 # custos incorridos e pagos
 realizado <- custos %>% 
   # filtrar custo de responsabilidade da GRA
   filter ( org_custo == "GRA") %>%
   # group_by e summarise para deixar no mesmo formato da df "projetado"
-  group_by(favorecido, favorecido_cod, mm_ano_cod, mes, mes_nome, chave) %>% 
+  group_by(fav, fav_cod, mm_ano_cod, mes, mes_nome, chave) %>% 
   summarise(custo = sum (custo))%>% 
   #  alterar NA por 0
   mutate_all(~replace(., is.na(.), 0))
@@ -401,7 +400,7 @@ Row
 
 
 renderDT({
-tabela(custos %>% filter (org_custo == "GRA") %>%  group_by(favorecido, mes_nome) %>% summarise(custo = sum(custo)) %>% pivot_wider( names_from = mes_nome, values_from = custo) %>% mutate_all(~replace(., is.na(.), 0))
+tabela(custos %>% filter (org_custo == "GRA") %>%  group_by(fav, mes_nome) %>% summarise(custo = sum(custo)) %>% pivot_wider( names_from = mes_nome, values_from = custo) %>% mutate_all(~replace(., is.na(.), 0))
 %>%
   adorn_totals("col"),"Total")
 })
@@ -428,8 +427,8 @@ renderPlotly({
                 color = if_else(input$limite> sum(fluxo$custo),"blue","red")) +
    # https://mariano.eng.br/erro-cannot-set-lc-all-to-default-locale/
    # https://stackoverflow.com/questions/43099990/r-lubridate-weekdays-in-local-language
-    annotate("text", label = paste0 ("custos pagos até ", month(max(realizado$mes), label = TRUE, abbr = FALSE, 
-  locale = "pt_BR.UTF-8"),": ", reais (sum(realizado$custo))),
+    annotate("text", label = paste0 ("custos pagos até ", month(max(realizado$mes), label = TRUE, abbr = FALSE,),": ", reais (sum(realizado$custo))),
+    # locale = "pt_BR.UTF-8"),": ", reais (sum(realizado$custo))),
              x = max(realizado$mes)+ 30, 
              y = sum(realizado$custo) + 10000, size = 4,
              colour = "black")+   
@@ -470,9 +469,9 @@ tabela (credito %>%   group_by(uo, ugr) %>% summarise(credito = sum(saldo)))
 ```{r}
 
 
-saldo_org <- custos %>% filter (imovel_custo == "Nunes Machado", favorecido_cod %in% fornecerdor_nunes_machado) %>%  group_by(org_custo) %>% summarise(custo = sum(custo)) 
+saldo_org <- custos %>% filter (imovel_custo == "Nunes Machado", fav_cod %in% fornecerdor_nunes_machado) %>%  group_by(org_custo) %>% summarise(custo = sum(custo)) 
 
-saldo_uo <- custos %>% filter (imovel_custo == "Nunes Machado", favorecido_cod %in% fornecerdor_nunes_machado) %>%  group_by(org_pago) %>% summarise(pago = sum(custo)) 
+saldo_uo <- custos %>% filter (imovel_custo == "Nunes Machado", fav_cod %in% fornecerdor_nunes_machado) %>%  group_by(org_pago) %>% summarise(pago = sum(custo)) 
 
 saldo_custo <- full_join(saldo_org,saldo_uo, by = c ("org_custo" = "org_pago")) %>% mutate_all(~replace(., is.na(.), 0))%>% mutate(saldo = pago - custo)
 
@@ -523,7 +522,7 @@ Row
 
 ```{r}
 renderDT({
-tabela(custos %>% filter (imovel_custo == "Nunes Machado", favorecido_cod %in% fornecerdor_nunes_machado) %>%  group_by(favorecido, mes_nome) %>% summarise(custo = sum(custo)) %>% pivot_wider( names_from = mes_nome, values_from = custo) %>% mutate_all(~replace(., is.na(.), 0))%>%
+tabela(custos %>% filter (imovel_custo == "Nunes Machado", fav_cod %in% fornecerdor_nunes_machado) %>%  group_by(fav, mes_nome) %>% summarise(custo = sum(custo)) %>% pivot_wider( names_from = mes_nome, values_from = custo) %>% mutate_all(~replace(., is.na(.), 0))%>%
   adorn_totals("col"),"Total"
 ) 
 })
@@ -538,7 +537,7 @@ Row
 # https://stackoverflow.com/questions/4946873/add-row-to-a-data-frame-with-total-sum-for-each-column
 
 renderDT({
-tabela(custos %>% filter (imovel_custo == "Nunes Machado", favorecido_cod %in% fornecerdor_nunes_machado) %>%  group_by(org, mes_nome) %>% summarise(custo = sum(custo)) %>% pivot_wider( names_from = mes_nome, values_from = custo) %>% mutate_all(~replace(., is.na(.), 0))%>%
+tabela(custos %>% filter (imovel_custo == "Nunes Machado", fav_cod %in% fornecerdor_nunes_machado) %>%  group_by(org, mes_nome) %>% summarise(custo = sum(custo)) %>% pivot_wider( names_from = mes_nome, values_from = custo) %>% mutate_all(~replace(., is.na(.), 0))%>%
   adorn_totals("col"),"Total")
   
 })
@@ -555,7 +554,7 @@ CGU
 
 ```{r}
 renderDT({
-tabela(custos %>% filter (centro_custo_cod %in% c("S6SC006CGU","S6SC003CGU", "S612SC006")) %>%  group_by( centro_custo ,favorecido,ndd, mes_nome) %>% summarise(custo = sum(custo)) %>% pivot_wider( names_from = mes_nome, values_from = custo) %>% mutate_all(~replace(., is.na(.), 0))%>%
+tabela(custos %>% filter (centro_custo_cod %in% c("S6SC006CGU","S6SC003CGU", "S612SC006")) %>%  group_by( centro_custo ,fav,ndd, mes_nome) %>% summarise(custo = sum(custo)) %>% pivot_wider( names_from = mes_nome, values_from = custo) %>% mutate_all(~replace(., is.na(.), 0))%>%
   adorn_totals("col"),"Total"
 ) 
 })
@@ -572,7 +571,7 @@ Row
 
 ```{r, rateio pfn}
 
-tabela(custos %>% filter (org == "PFN") %>%  group_by( favorecido,ndd_cod, mes_nome) %>% summarise(custo = sum(custo)) %>% pivot_wider( names_from = mes_nome, values_from = custo) %>% mutate_all(~replace(., is.na(.), 0))%>%
+tabela(custos %>% filter (org == "PFN") %>%  group_by( fav,ndd_cod, mes_nome) %>% summarise(custo = sum(custo)) %>% pivot_wider( names_from = mes_nome, values_from = custo) %>% mutate_all(~replace(., is.na(.), 0))%>%
   adorn_totals("col"),"Total"
 ) 
 
@@ -581,7 +580,7 @@ tabela(custos %>% filter (org == "PFN") %>%  group_by( favorecido,ndd_cod, mes_n
 
 
 ```{r custos pfn, eval=FALSE, include=FALSE}
-tabela(custos %>% filter (org == "PFN", startsWith (pi_cod, "RAT")) %>%  group_by( favorecido,ndd_cod, mes_nome, ne, doc_habil) %>% summarise(custo = sum(custo)) ) 
+tabela(custos %>% filter (org == "PFN", startsWith (pi_cod, "RAT")) %>%  group_by( fav,ndd_cod, mes_nome, ne, doc_habil) %>% summarise(custo = sum(custo)) ) 
 ```
 
 Row
@@ -638,7 +637,7 @@ Row
 ### Repasse
 
 ```{r}
-tabela(repasse %>% group_by( cc, fonte_deta) %>% summarise(saldo = sum(saldo)))
+tabela(repasse %>% group_by( cc, fonte_det) %>% summarise(saldo = sum(saldo)))
 ```
 Row
 --------------------------------------------------------------------------
@@ -646,7 +645,7 @@ Row
 ### Limite
 
 ```{r}
-tabela(limite %>% group_by( cc, fonte) %>% summarise(saldo = sum(saldo)))
+tabela(limite %>% group_by( cc, fonte_det) %>% summarise(saldo = sum(saldo)))
 ```
 
 
