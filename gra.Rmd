@@ -165,20 +165,20 @@ reais <- function(numero){
 ```{r importar saldo dos creditos, include=FALSE}
 
 #  importar relatório gerado no Tesouro Gerencial com dados sobre o crédito disponível e renomear as colunas
-credito <- dados("r_credito.xlsx", "tg2r_credito.xlsx")
+credito <- dados("~/Dropbox/r_credito_2.xlsx", "~/Dropbox/tg2r_credito_2.xlsx")
 
 
 ```
 
 
 ```{r importar saldo dos limites}
-limite <- dados("r_limite.xlsx", "tg2r_limite.xlsx")
+limite <- dados("~/Dropbox/r_limite.xlsx", "~/Dropbox/tg2r_financeiro.xlsx")
 
 
 ```
 
 ```{r importar saldo dos repasses a programas}
- repasse <- dados("r_repasse.xlsx", "tg2r_repasse.xlsx")
+ repasse <- dados("~/Dropbox/r_repasse.xlsx", "~/Dropbox/tg2r_financeiro.xlsx")
 ```
 
 
@@ -186,7 +186,7 @@ limite <- dados("r_limite.xlsx", "tg2r_limite.xlsx")
 ```{r importar custos }
 
 #  importar relatório gerado no Tesouro Gerencial com dados sobre o custos e renomear as colunas
-custos <- dados("r_custos.xlsx", "tg2r_custos.xlsx")
+custos <- dados("~/Dropbox/r_custos.xlsx", "~/Dropbox/tg2r_custos.xlsx")
 
 
 ```
