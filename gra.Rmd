@@ -201,6 +201,18 @@ reais <- function(numero){
 credito <- dados("~/Dropbox/r_credito_2.xlsx", "~/Dropbox/tg2r_credito_2.xlsx")
 
 
+credito <- credito %>%
+  
+ 
+  # somente se favorecido for UG concatenar código e nome da ug emitente e da ug favorecida
+  # a movimentação de crédito ocorre tanto do cliente para a GRA quanto da GRA para o cliente
+  mutate ( ug_ug = if_else(fav_tipo == "UG" & doc_tipo_cod == "NC" & ug_emit_cod != "170166",str_c(ug_emit_cod,fav_cod,ug_emit,fav),""))%>%
+  # retirar o nome e o código da GRA e manter apenas o código/nome do cliente
+  mutate (ug_cliente = str_replace(ug_ug, "GERENCIA REG.DE ADM.DO ME - SANTA CATARINA",""))%>%
+  mutate (ug_cliente = str_replace(ug_cliente, "170166",""))
+tabela(credito %>%  filter (ug_cliente !="") %>% group_by(ug_cliente, ugr_cod, fonte_det_cod) %>% summarise(saldo = sum(saldo)))
+tabela(etapas %>% filter(item_cod =="56") %>% group_by(ugr_cod, fonte_det_cod) %>% summarise(saldo = sum(saldo)))
+
 ```
 
 
@@ -701,6 +713,19 @@ Row
 
 ```{r}
 tabela(limite %>% group_by( cc, fonte_det) %>% summarise(saldo = sum(saldo)))
+```
+
+
+```{r}
+repasse <- repasse %>%
+  
+ 
+  # somente se favorecido for UG concatenar código e nome da ug emitente e da ug favorecida
+  # a movimentação de crédito ocorre tanto do cliente para a GRA quanto da GRA para o cliente
+  mutate ( ug_ug = if_else(fav_tipo == "UG",str_c(ug_emit_cod,fav_cod,ug_emit,fav),""))%>%
+  # retirar o nome e o código da GRA e manter apenas o código/nome do cliente
+  mutate (ug_cliente = str_replace(ug_ug, "GERENCIA REG.DE ADM.DO ME - SANTA CATARINA",""))%>%
+  mutate (ug_cliente = str_replace(ug_cliente, "170166",""))
 ```
 
 
