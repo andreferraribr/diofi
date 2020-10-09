@@ -213,6 +213,10 @@ credito <- credito %>%
 tabela(credito %>%  filter (ug_cliente !="") %>% group_by(ug_cliente, ugr_cod, fonte_det_cod) %>% summarise(saldo = sum(saldo)))
 tabela(etapas %>% filter(item_cod =="56") %>% group_by(ugr_cod, fonte_det_cod) %>% summarise(saldo = sum(saldo)))
 
+chave_pago <- etapas %>% filter(item_cod =="56") %>% group_by(ugr_cod, fonte_det_cod) %>% summarise(saldo = sum(saldo))
+
+chave_pago <- chave_pago %>%  mutate (chave_ugr_fonte= paste0(ugr_cod,fonte_det_cod))
+
 ```
 
 
@@ -224,6 +228,8 @@ limite <- dados("~/Dropbox/r_limite.xlsx", "~/Dropbox/tg2r_financeiro.xlsx")
 
 ```{r importar saldo dos repasses a programar}
  repasse <- dados("~/Dropbox/r_repasse.xlsx", "~/Dropbox/tg2r_financeiro.xlsx")
+tabela(repasse %>% group_by(ug_cliente, fonte_det_cod) %>% summarise(saldo = sum(saldo)))
+
 ```
 
 ```{r importa etapas da execução orçamentária}
