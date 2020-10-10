@@ -224,10 +224,34 @@ chave_pago <- chave_pago %>%  mutate (chave_ugr_fonte= paste0(ugr_cod,fonte_det_
 limite <- dados("~/Dropbox/r_limite.xlsx", "~/Dropbox/tg2r_financeiro.xlsx")
 
 
+limite <- limite %>%
+  
+ 
+  # somente se favorecido for UG concatenar código e nome da ug emitente e da ug favorecida
+  # a movimentação de crédito ocorre tanto do cliente para a GRA quanto da GRA para o cliente
+  mutate ( ug_ug = if_else(fav_tipo == "UG",str_c(ug_emit_cod,fav_cod,ug_emit,fav),""))%>%
+  # retirar o nome e o código da GRA e manter apenas o código/nome do cliente
+  mutate (ug_cliente = str_replace(ug_ug, "GERENCIA REG.DE ADM.DO ME - SANTA CATARINA",""))%>%
+  mutate (ug_cliente = str_replace(ug_cliente, "170166",""))
+
+tabela(limite %>% group_by(ug_cliente, fonte_det_cod) %>% summarise(saldo = sum(saldo)))
+
+
 ```
 
 ```{r importar saldo dos repasses a programar}
  repasse <- dados("~/Dropbox/r_repasse.xlsx", "~/Dropbox/tg2r_financeiro.xlsx")
+
+repasse <- repasse %>%
+  
+ 
+  # somente se favorecido for UG concatenar código e nome da ug emitente e da ug favorecida
+  # a movimentação de crédito ocorre tanto do cliente para a GRA quanto da GRA para o cliente
+  mutate ( ug_ug = if_else(fav_tipo == "UG",str_c(ug_emit_cod,fav_cod,ug_emit,fav),""))%>%
+  # retirar o nome e o código da GRA e manter apenas o código/nome do cliente
+  mutate (ug_cliente = str_replace(ug_ug, "GERENCIA REG.DE ADM.DO ME - SANTA CATARINA",""))%>%
+  mutate (ug_cliente = str_replace(ug_cliente, "170166",""))
+
 tabela(repasse %>% group_by(ug_cliente, fonte_det_cod) %>% summarise(saldo = sum(saldo)))
 
 ```
@@ -723,15 +747,25 @@ tabela(limite %>% group_by( cc, fonte_det) %>% summarise(saldo = sum(saldo)))
 
 
 ```{r}
-repasse <- repasse %>%
-  
- 
-  # somente se favorecido for UG concatenar código e nome da ug emitente e da ug favorecida
-  # a movimentação de crédito ocorre tanto do cliente para a GRA quanto da GRA para o cliente
-  mutate ( ug_ug = if_else(fav_tipo == "UG",str_c(ug_emit_cod,fav_cod,ug_emit,fav),""))%>%
-  # retirar o nome e o código da GRA e manter apenas o código/nome do cliente
-  mutate (ug_cliente = str_replace(ug_ug, "GERENCIA REG.DE ADM.DO ME - SANTA CATARINA",""))%>%
-  mutate (ug_cliente = str_replace(ug_cliente, "170166",""))
+
+limite %>% filter(doc_tipo_cod %!in% c( "PF",  "'-9") ) %>% summarise(saldo = sum(saldo))+etapas %>% filter(item_cod =="56") %>% summarise(saldo = sum(saldo))
+
+limite %>% filter(doc_tipo_cod %!in% c( "PF",  "'-9") )%>% group_by(doc_tipo) %>% summarise(saldo = sum(saldo))
+
+etapas %>% filter(item_cod =="56") %>% group_by(doc_tipo) %>% summarise(saldo = sum(saldo))
+
+repasse %>% filter (doc_tipo_cod %in% c("PF", "NL")) %>% summarise(saldo = sum(saldo))
+
+limite %>% filter (doc_tipo_cod %in% c("PF", "NL")) %>% summarise(saldo = sum(saldo))
+
+
+
+repasse %>% group_by(fonte_det_cod) %>% summarise(saldo = sum(saldo))
+limite %>% group_by(fonte_det_cod) %>% summarise(saldo = sum(saldo))
+rep_lim <- full_join(repasse %>% group_by(fonte_det_cod) %>% summarise(repasse = as.integer( sum(saldo))), limite %>% group_by(fonte_det_cod) %>% summarise(limite = as.integer( sum(saldo))))
+
+repasse %>% group_by(fonte_det_cod) %>% summarise(q = unique(ug_cliente)) %>% count(fonte_det_cod)
+
 ```
 
 
