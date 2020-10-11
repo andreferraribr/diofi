@@ -211,11 +211,7 @@ credito <- credito %>%
   mutate (ug_cliente = str_replace(ug_ug, "GERENCIA REG.DE ADM.DO ME - SANTA CATARINA",""))%>%
   mutate (ug_cliente = str_replace(ug_cliente, "170166",""))
 tabela(credito %>%  filter (ug_cliente !="") %>% group_by(ug_cliente, ugr_cod, fonte_det_cod) %>% summarise(saldo = sum(saldo)))
-tabela(etapas %>% filter(item_cod =="56") %>% group_by(ugr_cod, fonte_det_cod) %>% summarise(saldo = sum(saldo)))
 
-chave_pago <- etapas %>% filter(item_cod =="56") %>% group_by(ugr_cod, fonte_det_cod) %>% summarise(saldo = sum(saldo))
-
-chave_pago <- chave_pago %>%  mutate (chave_ugr_fonte= paste0(ugr_cod,fonte_det_cod))
 
 ```
 
@@ -258,6 +254,12 @@ tabela(repasse %>% group_by(ug_cliente, fonte_det_cod) %>% summarise(saldo = sum
 
 ```{r importa etapas da execução orçamentária}
  etapas <- dados("~/Dropbox/r_etapas.xlsx", "~/Dropbox/tg2r_etapas.xlsx")
+
+tabela(etapas %>% filter(item_cod =="56") %>% group_by(ugr_cod, fonte_det_cod) %>% summarise(saldo = sum(saldo)))
+
+chave_pago <- etapas %>% filter(item_cod =="56") %>% group_by(ugr_cod, fonte_det_cod) %>% summarise(saldo = sum(saldo))
+
+chave_pago <- chave_pago %>%  mutate (chave_ugr_fonte= paste0(ugr_cod,fonte_det_cod))
 ```
 
 
@@ -762,10 +764,23 @@ limite %>% filter (doc_tipo_cod %in% c("PF", "NL")) %>% summarise(saldo = sum(sa
 
 repasse %>% group_by(fonte_det_cod) %>% summarise(saldo = sum(saldo))
 limite %>% group_by(fonte_det_cod) %>% summarise(saldo = sum(saldo))
-rep_lim <- full_join(repasse %>% group_by(fonte_det_cod) %>% summarise(repasse = as.integer( sum(saldo))), limite %>% group_by(fonte_det_cod) %>% summarise(limite = as.integer( sum(saldo))))
+rep_lim <- full_join(repasse %>% group_by(fonte_det_cod) %>% summarise(repasse = ( sum(saldo))), limite %>% group_by(fonte_det_cod) %>% summarise(limite = ( sum(saldo))))
 
 repasse %>% group_by(fonte_det_cod) %>% summarise(q = unique(ug_cliente)) %>% count(fonte_det_cod)
 
+
+necessidade <- etapas %>% filter(item_cod %in% c("19","30", "32")) %>% group_by( fonte_det_cod, item) %>% summarise(saldo = sum(saldo)) %>%  pivot_wider( names_from = item, values_from = saldo)
+
+necessidade_financeira <- full_join(necessidade, rep_lim)
+
+necessidade_financeira <- necessidade_financeira %>% mutate(saldo_imeditado = limite - `DESPESAS LIQUIDADAS A PAGAR(CONTROLE EMPENHO)`,
+                                                            saldo_total = limite + repasse - `CREDITO DISPONIVEL`- `DESPESAS EMPENHADAS A LIQUIDAR (CONTROLE EMP)`- `DESPESAS LIQUIDADAS A PAGAR(CONTROLE EMPENHO)`)
+
+tabela(necessidade_financeira)
+
+nes_fin_imedita <- full_join(necessidade %>% select (fonte_det_cod ,`DESPESAS LIQUIDADAS A PAGAR(CONTROLE EMPENHO)`) ,limite %>% group_by(fonte_det_cod) %>% summarise(limite = ( sum(saldo)))) %>% mutate(saldo = limite - `DESPESAS LIQUIDADAS A PAGAR(CONTROLE EMPENHO)` )
+
+tabela (nes_fin_imedita)
 ```
 
 
