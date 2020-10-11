@@ -781,6 +781,13 @@ tabela(necessidade_financeira)
 nes_fin_imedita <- full_join(necessidade %>% select (fonte_det_cod ,`DESPESAS LIQUIDADAS A PAGAR(CONTROLE EMPENHO)`) ,limite %>% group_by(fonte_det_cod) %>% summarise(limite = ( sum(saldo)))) %>% mutate(saldo = limite - `DESPESAS LIQUIDADAS A PAGAR(CONTROLE EMPENHO)` )
 
 tabela (nes_fin_imedita)
+
+necessidade_financeira <- necessidade_financeira %>%  mutate(necessidade = `CREDITO DISPONIVEL`+ `DESPESAS EMPENHADAS A LIQUIDAR (CONTROLE EMP)`+ `DESPESAS LIQUIDADAS A PAGAR(CONTROLE EMPENHO)`)
+
+necessidade_financeira <- necessidade_financeira %>% select(fonte_det_cod, necessidade, repasse, limite) %>% mutate(saldo_financeiro = repasse + limite - necessidade )
+
+tabela(necessidade_financeira)
+
 ```
 
 
