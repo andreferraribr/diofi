@@ -81,6 +81,10 @@ drive_download("~/Attachments/r_limite.xlsx",
 
 drive_download("~/Attachments/r_repasse.xlsx",
                overwrite = TRUE)
+
+
+drive_download("~/Attachments/r_etapas.xlsx",
+               overwrite = TRUE)
 ```
 
 
@@ -210,7 +214,7 @@ credito <- credito %>%
   # retirar o nome e o código da GRA e manter apenas o código/nome do cliente
   mutate (ug_cliente = str_replace(ug_ug, "GERENCIA REG.DE ADM.DO ME - SANTA CATARINA",""))%>%
   mutate (ug_cliente = str_replace(ug_cliente, "170166",""))
-tabela(credito %>%  filter (ug_cliente !="") %>% group_by(ug_cliente, ugr_cod, fonte_det_cod) %>% summarise(saldo = sum(saldo)))
+# tabela(credito %>%  filter (ug_cliente !="") %>% group_by(ug_cliente, ugr_cod, fonte_det_cod) %>% summarise(saldo = sum(saldo)))
 
 
 ```
@@ -230,7 +234,7 @@ limite <- limite %>%
   mutate (ug_cliente = str_replace(ug_ug, "GERENCIA REG.DE ADM.DO ME - SANTA CATARINA",""))%>%
   mutate (ug_cliente = str_replace(ug_cliente, "170166",""))
 
-tabela(limite %>% group_by(ug_cliente, fonte_det_cod) %>% summarise(saldo = sum(saldo)))
+# tabela(limite %>% group_by(ug_cliente, fonte_det_cod) %>% summarise(saldo = sum(saldo)))
 
 
 ```
@@ -248,14 +252,14 @@ repasse <- repasse %>%
   mutate (ug_cliente = str_replace(ug_ug, "GERENCIA REG.DE ADM.DO ME - SANTA CATARINA",""))%>%
   mutate (ug_cliente = str_replace(ug_cliente, "170166",""))
 
-tabela(repasse %>% group_by(ug_cliente, fonte_det_cod) %>% summarise(saldo = sum(saldo)))
+# tabela(repasse %>% group_by(ug_cliente, fonte_det_cod) %>% summarise(saldo = sum(saldo)))
 
 ```
 
 ```{r importa etapas da execução orçamentária}
  etapas <- dados("~/Dropbox/r_etapas.xlsx", "~/Dropbox/tg2r_etapas.xlsx")
 
-tabela(etapas %>% filter(item_cod =="56") %>% group_by(ugr_cod, fonte_det_cod) %>% summarise(saldo = sum(saldo)))
+# tabela(etapas %>% filter(item_cod =="56") %>% group_by(ugr_cod, fonte_det_cod) %>% summarise(saldo = sum(saldo)))
 
 chave_pago <- etapas %>% filter(item_cod =="56") %>% group_by(ugr_cod, fonte_det_cod) %>% summarise(saldo = sum(saldo))
 
@@ -570,6 +574,9 @@ renderDT({
 tabela (credito %>%  filter(ugr_cod %in% c("170166","170475")) %>% group_by(nd_cod, pi, pi_cod) %>% summarise(credito = sum(saldo)))
   
   })
+
+
+# tabela(etapas %>% filter(item_cod %in% c(19, 30), ugr_cod == "170166", endsWith (pi_cod, "UNIDES"), pi_cod != "S6403UNIDES") %>% group_by(pi) %>% summarise(saldo = sum(saldo)))
 ```
 
 
@@ -747,47 +754,62 @@ Row
 tabela(limite %>% group_by( cc, fonte_det) %>% summarise(saldo = sum(saldo)))
 ```
 
+Necessidade Financeira
+=============================================
+
+-
+
+### Necessidade Financeira
 
 ```{r}
 
-limite %>% filter(doc_tipo_cod %!in% c( "PF",  "'-9") ) %>% summarise(saldo = sum(saldo))+etapas %>% filter(item_cod =="56") %>% summarise(saldo = sum(saldo))
-
-limite %>% filter(doc_tipo_cod %!in% c( "PF",  "'-9") )%>% group_by(doc_tipo) %>% summarise(saldo = sum(saldo))
-
-etapas %>% filter(item_cod =="56") %>% group_by(doc_tipo) %>% summarise(saldo = sum(saldo))
-
-repasse %>% filter (doc_tipo_cod %in% c("PF", "NL")) %>% summarise(saldo = sum(saldo))
-
-limite %>% filter (doc_tipo_cod %in% c("PF", "NL")) %>% summarise(saldo = sum(saldo))
-
-
-
-repasse %>% group_by(fonte_det_cod) %>% summarise(saldo = sum(saldo))
-limite %>% group_by(fonte_det_cod) %>% summarise(saldo = sum(saldo))
+# limite %>% filter(doc_tipo_cod %!in% c( "PF",  "'-9") ) %>% summarise(saldo = sum(saldo))+etapas %>% filter(item_cod =="56") %>% summarise(saldo = sum(saldo))
+# 
+# limite %>% filter(doc_tipo_cod %!in% c( "PF",  "'-9") )%>% group_by(doc_tipo) %>% summarise(saldo = sum(saldo))
+# 
+# etapas %>% filter(item_cod =="56") %>% group_by(doc_tipo) %>% summarise(saldo = sum(saldo))
+# 
+# repasse %>% filter (doc_tipo_cod %in% c("PF", "NL")) %>% summarise(saldo = sum(saldo))
+# 
+# limite %>% filter (doc_tipo_cod %in% c("PF", "NL")) %>% summarise(saldo = sum(saldo))
+# 
+# 
+# 
+# repasse %>% group_by(fonte_det_cod) %>% summarise(saldo = sum(saldo))
+# limite %>% group_by(fonte_det_cod) %>% summarise(saldo = sum(saldo))
 rep_lim <- full_join(repasse %>% group_by(fonte_det_cod) %>% summarise(repasse = ( sum(saldo))), limite %>% group_by(fonte_det_cod) %>% summarise(limite = ( sum(saldo))))
 
-repasse %>% group_by(fonte_det_cod) %>% summarise(q = unique(ug_cliente)) %>% count(fonte_det_cod)
+# repasse %>% group_by(fonte_det_cod) %>% summarise(q = unique(ug_cliente)) %>% count(fonte_det_cod)
 
 
-necessidade <- etapas %>% filter(item_cod %in% c("19","30", "32")) %>% group_by( fonte_det_cod, item) %>% summarise(saldo = sum(saldo)) %>%  pivot_wider( names_from = item, values_from = saldo)
+necessidade <- etapas %>% filter(item_cod %in% c("19","30", "32", "47")) %>% group_by( fonte_det_cod, item) %>% summarise(saldo = sum(saldo)) %>%  pivot_wider( names_from = item, values_from = saldo)
 
 necessidade_financeira <- full_join(necessidade, rep_lim)
 
 necessidade_financeira <- necessidade_financeira %>% mutate(saldo_imeditado = limite - `DESPESAS LIQUIDADAS A PAGAR(CONTROLE EMPENHO)`,
-                                                            saldo_total = limite + repasse - `CREDITO DISPONIVEL`- `DESPESAS EMPENHADAS A LIQUIDAR (CONTROLE EMP)`- `DESPESAS LIQUIDADAS A PAGAR(CONTROLE EMPENHO)`)
+                                                            saldo_total = limite + repasse - `CREDITO DISPONIVEL`- `DESPESAS EMPENHADAS A LIQUIDAR (CONTROLE EMP)`- `DESPESAS LIQUIDADAS A PAGAR(CONTROLE EMPENHO)`- `RESTOS A PAGAR NAO PROCESSADOS A PAGAR`)
 
-tabela(necessidade_financeira)
+
 
 nes_fin_imedita <- full_join(necessidade %>% select (fonte_det_cod ,`DESPESAS LIQUIDADAS A PAGAR(CONTROLE EMPENHO)`) ,limite %>% group_by(fonte_det_cod) %>% summarise(limite = ( sum(saldo)))) %>% mutate(saldo = limite - `DESPESAS LIQUIDADAS A PAGAR(CONTROLE EMPENHO)` )
 
-tabela (nes_fin_imedita)
+
 
 necessidade_financeira <- necessidade_financeira %>%  mutate(necessidade = `CREDITO DISPONIVEL`+ `DESPESAS EMPENHADAS A LIQUIDAR (CONTROLE EMP)`+ `DESPESAS LIQUIDADAS A PAGAR(CONTROLE EMPENHO)`)
 
 necessidade_financeira <- necessidade_financeira %>% select(fonte_det_cod, necessidade, repasse, limite) %>% mutate(saldo_financeiro = repasse + limite - necessidade )
 
-tabela(necessidade_financeira)
+tabela (necessidade_financeira)
 
 ```
 
+
+
+
+### Necessidade Financeira
+
+
+```{r}
+tabela (nes_fin_imedita)
+```
 
