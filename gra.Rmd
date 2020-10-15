@@ -11,6 +11,7 @@ output:
 runtime: shiny
 resource_files:
 - diofi.Rproj
+- .secrets/cd26ed5dc626f11802a652e81d02762e_tesouro2r@gmail.com
 ---
 
 
@@ -18,7 +19,7 @@ resource_files:
 ```{r setup, include=FALSE}
 options(scipen=999)
 options(digits=2)
-options (LC_NUMERIC="pt_BR.UTF-8")
+# options (LC_NUMERIC="pt_BR.UTF-8")
 
 
 ```
@@ -29,11 +30,11 @@ options (LC_NUMERIC="pt_BR.UTF-8")
 ```{r libraries,  message=FALSE}
 library(flexdashboard)
 library(readxl)
-library(ggplot2)
+# library(ggplot2)
 library(stringr)
-library(plotly)
+# library(plotly)
 library(DT)
-library(knitr)
+# library(knitr)
 library(shiny)
 library(shinyWidgets)
 library(lubridate)
@@ -41,7 +42,7 @@ library(tidyverse)
 library(janitor)
 library(googledrive)
 library(gargle)
-library(gsheet)
+# library(gsheet)
 # library("microbenchmark")
 # library("ggplot2movies")
 # library("profvis")
@@ -65,7 +66,7 @@ library(gsheet)
 '%!in%' <- Negate('%in%')
 ```
 
-```{r function dados importar e renomear variaveis}
+```{r função "dados" importar e renomear variaveis}
 
 # funcao para importar dados e renomear variaveis
 
@@ -80,7 +81,7 @@ dados = function(tg, depara){
 }
 ```
 
-```{r function tabela formatar numeros incluir totalizador}
+```{r função "tabela" formatar numeros incluir totalizador}
 
 # comentar funcao e parametro para totalizar colunas e linhas
 # ajustar formatacao de acordo com a opcao de totalizar
@@ -118,7 +119,7 @@ tabela = function (df,coluna = NULL) {
 }
 
 
-
+# mesma lógica da função "tabela", mas com o objetivo de apresentar os números no formato R$
 tabela_reais = function (df,coluna = NULL) {
       datatable((df)%>%
   # "row" para o total aparecer na linha, ou seja, totalizar os valores de uma coluna
@@ -153,7 +154,7 @@ tabela_reais = function (df,coluna = NULL) {
 
 
 
-```{r function reais para embelezar numeros}
+```{r função "reais" para embelezar numeros}
 
 # embelezar o número do value box
 
@@ -175,7 +176,7 @@ reais <- function(numero){
 # https://medium.com/@JosiahParry/googlesheets4-authentication-for-deployment-9e994b4c81d6
 
 # drive_auth(use_oob = TRUE)
-drive_deauth()
+# drive_deauth()
 
 options(gargle_oauth_cache = ".secrets")
 
@@ -246,7 +247,7 @@ custos <- dados("r_custos.xlsx", "tg2r_custos.xlsx")
 
 
 
-```{r importar saldo dos creditos, include=FALSE}
+```{r criar na tabela crédito a variável ug_cliente, include=FALSE}
 
 
 credito <- credito %>%
@@ -264,7 +265,7 @@ credito <- credito %>%
 ```
 
 
-```{r importar saldo dos limites}
+```{r criar na tabela limite a variável ug_cliente}
 
 
 
@@ -283,7 +284,7 @@ limite <- limite %>%
 
 ```
 
-```{r importar saldo dos repasses a programar}
+```{r criar na tabela repasse a variável "ug_cliente"}
 
 
 repasse <- repasse %>%
@@ -300,26 +301,20 @@ repasse <- repasse %>%
 
 ```
 
-```{r importa etapas da execução orçamentária}
+```{r icriar na tabela etapa a variável cc_chave}
 
 
 # tabela(etapas %>% filter(item_cod =="56") %>% group_by(ugr_cod, fonte_det_cod) %>% summarise(saldo = sum(saldo)))
 
-chave_pago <- etapas %>% filter(item_cod =="56") %>% group_by(ugr_cod, fonte_det_cod) %>% summarise(saldo = sum(saldo))
+# chave_pago <- etapas %>% filter(item_cod =="56") %>% group_by(ugr_cod, fonte_det_cod) %>% summarise(saldo = sum(saldo))
 
-chave_pago <- chave_pago %>%  mutate (chave_ugr_fonte= paste0(ugr_cod,fonte_det_cod))
+# etapas <- etapas %>%  mutate (cc_chave = paste0(esfera_cod, ptres,fonte_det_cod, nd_cod,ugr_cod, pi_cod))
+
+etapas <- etapas %>%  mutate (cc_chave = paste0(fonte_det_cod, nd_cod,ugr_cod, pi_cod))
 ```
 
 
-```{r importar custos }
-
-
-
-
-```
-
-
-```{r mutate mes e chave}
+```{r criar na tabela custos as variáveis "mes" e "chave"}
 custos <- custos %>% 
   # criar variável mes no formato ymd
   mutate ( 
@@ -327,7 +322,7 @@ custos <- custos %>%
     mes = ymd (paste0(custos$mm_ano_cod,"01")),
     # obter o nome do mes
     mes_nome = month(mes, label = TRUE)) %>% 
-  # criar variável chave para servir de primary key nos joins de custo realizado, projetado e monitorado.
+  # criar variável chave para servir de chave primária nos joins de custo realizado, projetado e monitorado.
   mutate (chave = paste0(fav, mm_ano_cod))
 
 #https://stackoverflow.com/questions/43772996/r-calculate-month-end
@@ -356,7 +351,13 @@ custos <- custos %>% mutate(org = case_when(
   TRUE  ~ "outras orgs"))
 
 # criar variável para identificar custos associados ao imóvel da GRA (Nunes Machado)
-custos <- custos %>% mutate(imovel_custo = if_else(org == "outras orgs", centro_custo, "Nunes Machado" ))
+# custos <- custos %>% mutate(imovel_custo = if_else(org == "outras orgs", centro_custo, "Nunes Machado" ))
+
+custos <- custos %>% mutate(imovel_custo = case_when(
+  startsWith(ug_icc, "PROC") & centro_custo_cod != "621SC003" ~ ug_icc,
+  org != "outras orgs" ~ "Nunes Machado",
+  TRUE ~ centro_custo
+))
 
 # variável 'org_custo' para identificar a instituição responsável pelo custo
 # pelas regras atuais a GRA é responsável pelos custos da SPU (mudou o entendimento em julho/2020)
@@ -573,6 +574,24 @@ ggplotly(historico  )
 })
 ```
 
+Custos dos Imóveis
+============================================
+
+```{r}
+
+selectInput("imovel", "imóvel", choices = unique (custos$imovel_custo), selected = "Nunes Machado")
+
+
+renderDT({
+tabela(custos %>% filter (imovel_custo == input$imovel) %>%  group_by(fav, mes_nome) %>% summarise(custo = sum(custo)) %>% pivot_wider( names_from = mes_nome, values_from = custo) %>% mutate_all(~replace(., is.na(.), 0))%>%
+  adorn_totals("col"),"Total"
+) 
+})
+
+```
+
+
+
 Crédito
 =============================================
 
@@ -767,9 +786,9 @@ Row
 
 ### Etapas
 
-```{r}
+```{r etapas da execução da despesa}
 
-tabela(etapas %>% group_by( uo_cod, ugr, fonte_det_cod, pi, nd_cod, item) %>% summarise(saldo = sum(saldo)) %>%  pivot_wider( names_from = item, values_from = saldo))
+tabela(etapas %>% group_by(  pi, cc_chave,   item) %>% summarise(saldo = sum(saldo)) %>%  pivot_wider( names_from = item, values_from = saldo))
 
 
 ```
