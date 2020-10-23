@@ -42,6 +42,8 @@ library(tidyverse)
 library(janitor)
 library(googledrive)
 library(gargle)
+# library(googlesheets4)
+# library(cronR)
 # library(gsheet)
 # library("microbenchmark")
 # library("ggplot2movies")
@@ -55,6 +57,9 @@ library(gargle)
 
 ```{r}
 # profvis({  
+
+# profvis::profvis(expr = rmarkdown::run("flexdashboard.Rmd"), prof_output = "flexdashboard.html")
+# https://community.rstudio.com/t/faster-flexdashboard-loading/28681/2
 ```
 
 
@@ -124,7 +129,8 @@ tabela_reais = function (df,coluna = NULL) {
       datatable((df)%>%
   # "row" para o total aparecer na linha, ou seja, totalizar os valores de uma coluna
   adorn_totals("row") ,
-      filter = 'top',          
+      filter = 'top', 
+      rownames = FALSE,
       extensions = 'Buttons',
       options = list( 
                   # order = list (df[(length(df))], 'desc'),
@@ -148,7 +154,7 @@ tabela_reais = function (df,coluna = NULL) {
   interval = 3,
   mark = ".",
   dec.mark = ","
-)
+) 
 }
 ```
 
@@ -164,7 +170,9 @@ reais <- function(numero){
 ```
 
 
-```{r baixar arquivo do google drive}
+
+
+```{r baixar arquivo do google drive, eval=FALSE, include=FALSE}
 # https://gargle.r-lib.org/articles/non-interactive-auth.html
 
 # https://gargle.r-lib.org/articles/troubleshooting.html
@@ -175,12 +183,16 @@ reais <- function(numero){
 
 # https://medium.com/@JosiahParry/googlesheets4-authentication-for-deployment-9e994b4c81d6
 
+
+
+
 # drive_auth(use_oob = TRUE)
-# drive_deauth()
+ # drive_deauth()
 
 options(gargle_oauth_cache = ".secrets")
 
 options(gargle_oauth_email = TRUE)
+
 
 
 options(gargle_oauth_email = "tesouro2r@gmail.com")
@@ -209,8 +221,13 @@ drive_download("~/Attachments/r_etapas.xlsx",
 
 drive_download("~/Attachments/projetado.xlsx",
                overwrite = TRUE)
+
+
+
+drive_download("~/Attachments/r_pagamentos.xlsx",
+               overwrite = TRUE)
 ```
-```{r utilizar a função dados para renomear colunas dos arquivos baixados do Google Drive}
+```{r utilizar a função dados para renomear colunas dos arquivos baixados do Google Drive, echo=FALSE}
 
 projetado <- read_xlsx("projetado.xlsx")
 
@@ -225,24 +242,26 @@ etapas <- dados("r_etapas.xlsx", "tg2r_etapas.xlsx")
 #  importar relatório gerado no Tesouro Gerencial com dados sobre o custos e renomear as colunas
 custos <- dados("r_custos.xlsx", "tg2r_custos.xlsx")
 
+pagamentos <- dados("r_pagamentos.xlsx", "tg2r_pagamentos.xlsx")
+
 ```
 
-```{r importar arquivos do dropbox, eval=FALSE, include=FALSE}
+```{r importar arquivos do dropbox}
 #  importar relatório gerado no Tesouro Gerencial com dados sobre o crédito disponível e renomear as colunas
-# credito <- dados("~/Dropbox/r_credito_2.xlsx", "~/Dropbox/tg2r_credito_2.xlsx")
-# 
-# limite <- dados("~/Dropbox/r_limite.xlsx", "~/Dropbox/tg2r_financeiro.xlsx")
-# 
-# repasse <- dados("~/Dropbox/r_repasse.xlsx", "~/Dropbox/tg2r_financeiro.xlsx")
-# 
-# etapas <- dados("~/Dropbox/r_etapas.xlsx", "~/Dropbox/tg2r_etapas.xlsx")
+credito <- dados("~/Dropbox/r_credito_2.xlsx", "~/Dropbox/tg2r_credito_2.xlsx")
+
+limite <- dados("~/Dropbox/r_limite.xlsx", "~/Dropbox/tg2r_financeiro.xlsx")
+
+repasse <- dados("~/Dropbox/r_repasse.xlsx", "~/Dropbox/tg2r_financeiro.xlsx")
+
+etapas <- dados("~/Dropbox/r_etapas.xlsx", "~/Dropbox/tg2r_etapas.xlsx")
 # 
 # #  importar relatório gerado no Tesouro Gerencial com dados sobre o custos e renomear as colunas
-# custos <- dados("~/Dropbox/r_custos.xlsx", "~/Dropbox/tg2r_custos.xlsx")
+custos <- dados("~/Dropbox/r_custos.xlsx", "~/Dropbox/tg2r_custos.xlsx")
 
 
 # previsão anual do custos (Os gestores devem preencher a tabela)
-# projetado <- read_xlsx("~/Dropbox/projetado.xlsx")
+projetado <- read_xlsx("~/Dropbox/projetado.xlsx")
 ```
 
 
@@ -338,6 +357,9 @@ custos <- custos %>%
 
 # variável 'org' para vincular os centros de custos do imóvel da Nunes Machado (GRA/SC) às siglas das instituições
 
+
+
+
 custos <- custos %>% mutate(org = case_when(
   centro_custo_cod == "S6SC002MCTI" ~ "MCTIC",
   centro_custo_cod == "S6SC001ABIN" ~ "ABIN",
@@ -358,6 +380,9 @@ custos <- custos %>% mutate(imovel_custo = case_when(
   org != "outras orgs" ~ "Nunes Machado",
   TRUE ~ centro_custo
 ))
+
+
+                        
 
 # variável 'org_custo' para identificar a instituição responsável pelo custo
 # pelas regras atuais a GRA é responsável pelos custos da SPU (mudou o entendimento em julho/2020)
@@ -398,7 +423,7 @@ custos <- custos %>% mutate(org_pago = case_when(
 
 ```{r cnpj dos prestadores dos serviços compartilhados do imóvel da Nunes Machado - GRA}
 
-fornecerdor_nunes_machado <- c("05027397000129","05600954000159","08336783000190","10364152000127","78533312000158","82508433000117","82892282000143")
+fornecerdor_nunes_machado <- c("05027397000129","05600954000159","08336783000190","10364152000127","78533312000158","82508433000117","82892282000143","12573088000110")
 
 ```
 
@@ -583,10 +608,17 @@ selectInput("imovel", "imóvel", choices = unique (custos$imovel_custo), selecte
 
 
 renderDT({
-tabela(custos %>% filter (imovel_custo == input$imovel) %>%  group_by(fav, mes_nome) %>% summarise(custo = sum(custo)) %>% pivot_wider( names_from = mes_nome, values_from = custo) %>% mutate_all(~replace(., is.na(.), 0))%>%
+tabela(custos %>% filter (imovel_custo == input$imovel) %>%  group_by(fav, ndd, pi , mes_nome) %>% summarise(custo = sum(custo)) %>% pivot_wider( names_from = mes_nome, values_from = custo) %>% mutate_all(~replace(., is.na(.), 0))%>%
   adorn_totals("col"),"Total"
-) 
+)
 })
+
+
+# renderDT({
+# tabela(custos %>%   group_by(imovel_custo,  fav, ndd, pi , mes_nome) %>% summarise(custo = sum(custo)) %>% pivot_wider( names_from = mes_nome, values_from = custo) %>% mutate_all(~replace(., is.na(.), 0))%>%
+#   adorn_totals("col"),"Total"
+# ) 
+# })
 
 ```
 
@@ -670,7 +702,7 @@ Row
 
 ```{r}
 renderDT({
-tabela(custos %>% filter (imovel_custo == "Nunes Machado", fav_cod %in% fornecerdor_nunes_machado) %>%  group_by(fav, mes_nome) %>% summarise(custo = sum(custo)) %>% pivot_wider( names_from = mes_nome, values_from = custo) %>% mutate_all(~replace(., is.na(.), 0))%>%
+tabela(custos %>% filter (imovel_custo == "Nunes Machado", fav_cod %in% fornecerdor_nunes_machado) %>%  group_by( mes_nome, fav) %>% summarise(custo = sum(custo)) %>% pivot_wider( names_from = mes_nome, values_from = custo, values_fill = 0) %>% arrange(fav)%>% mutate_all(~replace(., is.na(.), 0))%>%
   adorn_totals("col"),"Total"
 ) 
 })
@@ -685,7 +717,7 @@ Row
 # https://stackoverflow.com/questions/4946873/add-row-to-a-data-frame-with-total-sum-for-each-column
 
 renderDT({
-tabela(custos %>% filter (imovel_custo == "Nunes Machado", fav_cod %in% fornecerdor_nunes_machado) %>%  group_by(org, mes_nome) %>% summarise(custo = sum(custo)) %>% pivot_wider( names_from = mes_nome, values_from = custo) %>% mutate_all(~replace(., is.na(.), 0))%>%
+tabela(custos %>% filter (imovel_custo == "Nunes Machado", fav_cod %in% fornecerdor_nunes_machado) %>%  group_by(org, mes_nome) %>% summarise(custo = sum(custo)) %>% pivot_wider( names_from = mes_nome, values_from = custo, values_fill = 0) %>% mutate_all(~replace(., is.na(.), 0))%>%
   adorn_totals("col"),"Total")
   
 })
@@ -708,7 +740,7 @@ tabela(custos %>% filter (centro_custo_cod %in% c("S6SC006CGU","S6SC003CGU", "S6
 })
 ```
 ```{r}
-tabela(custos %>%   group_by( centro_custo, ug_icc, ugr, uo) %>% summarise(custo = sum(custo)) ) 
+# renderDT({tabela(custos %>%   group_by( centro_custo, ug_icc, ugr, uo) %>% summarise(custo = sum(custo)) ) })
 ```
 
 PFN
@@ -719,9 +751,9 @@ Row
 
 ```{r, rateio pfn}
 
-tabela(custos %>% filter (org == "PFN") %>%  group_by( fav,ndd_cod, mes_nome) %>% summarise(custo = sum(custo)) %>% pivot_wider( names_from = mes_nome, values_from = custo) %>% mutate_all(~replace(., is.na(.), 0))%>%
+renderDT({tabela(custos %>% filter (org == "PFN") %>%  group_by( fav,ndd_cod, mes_nome) %>% summarise(custo = sum(custo)) %>% pivot_wider( names_from = mes_nome, values_from = custo) %>% mutate_all(~replace(., is.na(.), 0))%>%
   adorn_totals("col"),"Total"
-) 
+) })
 
 ```
 
@@ -788,7 +820,7 @@ Row
 
 ```{r etapas da execução da despesa}
 
-tabela(etapas %>% group_by(  pi, cc_chave,   item) %>% summarise(saldo = sum(saldo)) %>%  pivot_wider( names_from = item, values_from = saldo))
+renderDT({tabela(etapas %>% group_by(  pi, cc_chave,   item) %>% summarise(saldo = sum(saldo)) %>%  pivot_wider( names_from = item, values_from = saldo))})
 
 
 ```
@@ -804,7 +836,7 @@ Row
 ### Repasse
 
 ```{r}
-tabela(repasse %>% group_by( cc, fonte_det) %>% summarise(saldo = sum(saldo)))
+renderDT({tabela(repasse %>% group_by( cc, fonte_det) %>% summarise(saldo = sum(saldo)))})
 ```
 Row
 --------------------------------------------------------------------------
@@ -812,7 +844,7 @@ Row
 ### Limite
 
 ```{r}
-tabela(limite %>% group_by( cc, fonte_det) %>% summarise(saldo = sum(saldo)))
+renderDT({tabela(limite %>% group_by( cc, fonte_det) %>% summarise(saldo = sum(saldo)))})
 ```
 
 Necessidade Financeira
@@ -820,7 +852,7 @@ Necessidade Financeira
 
 -
 
-### Necessidade Financeira
+### Necessidade Financeira ((credito disponível + empenhado + a liquidar + a pagar + rp a  pagar) - (repasse a programar + limite))
 
 ```{r}
 
@@ -852,25 +884,27 @@ necessidade_financeira <- necessidade_financeira %>% mutate(saldo_imeditado = li
 
 
 
-nes_fin_imedita <- full_join(necessidade %>% select (fonte_det_cod ,`DESPESAS LIQUIDADAS A PAGAR(CONTROLE EMPENHO)`) ,limite %>% group_by(fonte_det_cod) %>% summarise(limite = ( sum(saldo)))) %>% mutate(saldo = limite - `DESPESAS LIQUIDADAS A PAGAR(CONTROLE EMPENHO)` )
 
 
 
-necessidade_financeira <- necessidade_financeira %>%  mutate(necessidade = `CREDITO DISPONIVEL`+ `DESPESAS EMPENHADAS A LIQUIDAR (CONTROLE EMP)`+ `DESPESAS LIQUIDADAS A PAGAR(CONTROLE EMPENHO)`)
+
+necessidade_financeira <- necessidade_financeira %>%  mutate(necessidade = `CREDITO DISPONIVEL`+ `DESPESAS EMPENHADAS A LIQUIDAR (CONTROLE EMP)`+ `DESPESAS LIQUIDADAS A PAGAR(CONTROLE EMPENHO)`+`RESTOS A PAGAR NAO PROCESSADOS A PAGAR`)
 
 necessidade_financeira <- necessidade_financeira %>% select(fonte_det_cod, necessidade, repasse, limite) %>% mutate(saldo_financeiro = repasse + limite - necessidade )
 
-tabela (necessidade_financeira)
+renderDT({tabela (necessidade_financeira)})
 
 ```
 
 
 
 
-### Necessidade Financeira
+### Necessidade Financeira Imediata
 
 
 ```{r}
-tabela (nes_fin_imedita)
+nes_fin_imedita <- full_join(necessidade %>% select (fonte_det_cod ,`DESPESAS LIQUIDADAS A PAGAR(CONTROLE EMPENHO)`) ,limite %>% group_by(fonte_det_cod) %>% summarise(limite = ( sum(saldo)))) %>% mutate(saldo = limite - `DESPESAS LIQUIDADAS A PAGAR(CONTROLE EMPENHO)` )
+
+renderDT({tabela (nes_fin_imedita)})
 ```
 
