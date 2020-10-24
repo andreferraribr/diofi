@@ -870,14 +870,20 @@ Necessidade Financeira
 # 
 # repasse %>% group_by(fonte_det_cod) %>% summarise(saldo = sum(saldo))
 # limite %>% group_by(fonte_det_cod) %>% summarise(saldo = sum(saldo))
-rep_lim <- full_join(repasse %>% group_by(fonte_det_cod) %>% summarise(repasse = ( sum(saldo))), limite %>% group_by(fonte_det_cod) %>% summarise(limite = ( sum(saldo))))
+rep_lim <- full_join(repasse %>% group_by(fonte_det_cod) %>% summarise(repasse = ( sum(saldo))), limite %>% group_by(fonte_det_cod) %>% summarise(limite = ( sum(saldo))),   by = "fonte_det_cod")%>% 
+  #  alterar NA por 0
+  mutate_all(~replace(., is.na(.), 0))
 
 # repasse %>% group_by(fonte_det_cod) %>% summarise(q = unique(ug_cliente)) %>% count(fonte_det_cod)
 
 
-necessidade <- etapas %>% filter(item_cod %in% c("19","30", "32", "47")) %>% group_by( fonte_det_cod, item) %>% summarise(saldo = sum(saldo)) %>%  pivot_wider( names_from = item, values_from = saldo)
+necessidade <- etapas %>% filter(item_cod %in% c("19","30", "32", "47")) %>% group_by( fonte_det_cod, item) %>% summarise(saldo = sum(saldo)) %>%  pivot_wider( names_from = item, values_from = saldo)%>% 
+  #  alterar NA por 0
+  mutate_all(~replace(., is.na(.), 0))
 
-necessidade_financeira <- full_join(necessidade, rep_lim)
+necessidade_financeira <- full_join(necessidade, rep_lim, by = "fonte_det_cod")%>% 
+  #  alterar NA por 0
+  mutate_all(~replace(., is.na(.), 0))
 
 necessidade_financeira <- necessidade_financeira %>% mutate(saldo_imeditado = limite - `DESPESAS LIQUIDADAS A PAGAR(CONTROLE EMPENHO)`,
                                                             saldo_total = limite + repasse - `CREDITO DISPONIVEL`- `DESPESAS EMPENHADAS A LIQUIDAR (CONTROLE EMP)`- `DESPESAS LIQUIDADAS A PAGAR(CONTROLE EMPENHO)`- `RESTOS A PAGAR NAO PROCESSADOS A PAGAR`)
