@@ -172,7 +172,7 @@ reais <- function(numero){
 
 
 
-```{r baixar arquivo do google drive, eval=FALSE, include=FALSE}
+```{r baixar arquivo do google drive, include=FALSE}
 # https://gargle.r-lib.org/articles/non-interactive-auth.html
 
 # https://gargle.r-lib.org/articles/troubleshooting.html
@@ -183,23 +183,22 @@ reais <- function(numero){
 
 # https://medium.com/@JosiahParry/googlesheets4-authentication-for-deployment-9e994b4c81d6
 
+# https://cran.r-project.org/web/packages/gargle/vignettes/auth-from-web.html
 
 
-
-# drive_auth(use_oob = TRUE)
- # drive_deauth()
-
+# designate project-specific cache
 options(gargle_oauth_cache = ".secrets")
 
-options(gargle_oauth_email = TRUE)
+# check the value of the option, if you like
+gargle::gargle_oauth_cache()
 
+# trigger auth on purpose --> store a token in the specified cache
+drive_auth()
 
+# see your token file in the cache, if you like
+list.files(".secrets/")
 
-options(gargle_oauth_email = "tesouro2r@gmail.com")
-
-drive_auth(email = TRUE)
-
-drive_auth(email = "tesouro2r@gmail.com")
+ # drive_auth(email = "tesouro2r@gmail.com")
 
 drive_download("~/Attachments/r_custos.xlsx",
                overwrite = TRUE)
@@ -224,10 +223,8 @@ drive_download("~/Attachments/projetado.xlsx",
 
 
 
-drive_download("~/Attachments/r_pagamentos.xlsx",
-               overwrite = TRUE)
 ```
-```{r utilizar a função dados para renomear colunas dos arquivos baixados do Google Drive, echo=FALSE}
+```{r utilizar a função dados para renomear colunas dos arquivos baixados do Google Drive, include=FALSE}
 
 projetado <- read_xlsx("projetado.xlsx")
 
@@ -242,11 +239,11 @@ etapas <- dados("r_etapas.xlsx", "tg2r_etapas.xlsx")
 #  importar relatório gerado no Tesouro Gerencial com dados sobre o custos e renomear as colunas
 custos <- dados("r_custos.xlsx", "tg2r_custos.xlsx")
 
-pagamentos <- dados("r_pagamentos.xlsx", "tg2r_pagamentos.xlsx")
+
 
 ```
 
-```{r importar arquivos do dropbox}
+```{r importar arquivos do dropbox, eval=FALSE, include=FALSE}
 #  importar relatório gerado no Tesouro Gerencial com dados sobre o crédito disponível e renomear as colunas
 credito <- dados("~/Dropbox/r_credito_2.xlsx", "~/Dropbox/tg2r_credito_2.xlsx")
 
@@ -255,6 +252,8 @@ limite <- dados("~/Dropbox/r_limite.xlsx", "~/Dropbox/tg2r_financeiro.xlsx")
 repasse <- dados("~/Dropbox/r_repasse.xlsx", "~/Dropbox/tg2r_financeiro.xlsx")
 
 etapas <- dados("~/Dropbox/r_etapas.xlsx", "~/Dropbox/tg2r_etapas.xlsx")
+
+etapas_datas <- dados("~/Dropbox/r_etapas_datas.xlsx", "~/Dropbox/tg2r_etapas_datas.xlsx")
 # 
 # #  importar relatório gerado no Tesouro Gerencial com dados sobre o custos e renomear as colunas
 custos <- dados("~/Dropbox/r_custos.xlsx", "~/Dropbox/tg2r_custos.xlsx")
