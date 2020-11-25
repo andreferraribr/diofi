@@ -175,16 +175,10 @@ reais <- function(numero){
 ```{r baixar arquivo do google drive, include=FALSE}
 # https://gargle.r-lib.org/articles/non-interactive-auth.html
 
-# https://gargle.r-lib.org/articles/troubleshooting.html
 
-# https://stackoverflow.com/questions/22873602/importing-data-into-r-from-google-spreadsheet
 
-#  https://github.com/maxconway/gsheet
-
-# https://medium.com/@JosiahParry/googlesheets4-authentication-for-deployment-9e994b4c81d6
-
-# https://cran.r-project.org/web/packages/gargle/vignettes/auth-from-web.html
-
+# usar uma vez para obter o token
+# drive_auth(use_oob=TRUE)
 
 # designate project-specific cache
 options(gargle_oauth_cache = ".secrets")
@@ -221,6 +215,8 @@ drive_download("~/Attachments/r_etapas.xlsx",
 drive_download("~/Attachments/projetado.xlsx",
                overwrite = TRUE)
 
+drive_download("~/Attachments/r_credito.xlsx",
+               overwrite = TRUE)
 
 
 ```
@@ -490,7 +486,7 @@ Row {data-height=20}
 ```{r}
 
 
-sliderInput(inputId = "limite", label = "limite", min= 400000, max = 750000, value = 612000, step = NULL, round = FALSE,
+sliderInput(inputId = "limite", label = "limite", min= 400000, max = 500000, value = 460000, step = NULL, round = FALSE,
   format = NULL, locale = NULL, ticks = TRUE, animate = FALSE,
   width = NULL, sep = ",", pre = NULL, post = NULL, timeFormat = NULL,
   timezone = NULL, dragRange = TRUE)
@@ -911,5 +907,21 @@ renderDT({tabela (necessidade_financeira)})
 nes_fin_imedita <- full_join(necessidade %>% select (fonte_det_cod ,`DESPESAS LIQUIDADAS A PAGAR(CONTROLE EMPENHO)`) ,limite %>% group_by(fonte_det_cod) %>% summarise(limite = ( sum(saldo)))) %>% mutate(saldo = limite - `DESPESAS LIQUIDADAS A PAGAR(CONTROLE EMPENHO)` )
 
 renderDT({tabela (nes_fin_imedita)})
+```
+```{r}
+tabela(etapas %>% filter(item_cod == 30, ugr_cod %in% c(170166, 110255,240101,183038), fav_cod %in% fornecerdor_nunes_machado) %>%group_by(fav, uo) %>% summarise(saldo = sum(saldo)) )
+
+
+tabela(etapas %>% filter(item_cod == 30, uo_cod %in% c(25104)) %>%group_by( fav) %>% summarise(saldo = sum(saldo)) )
+
+
+tabela(credito %>% filter( uo_cod %in% c(25104)) %>% group_by(  pi) %>% summarise(saldo = sum(saldo)))
+
+
+tabela(custos %>% filter (uo_cod == 25104, imovel_custo != "Nunes Machado") %>%  group_by( pi,  fav , mes_nome) %>% summarise(custo = sum(custo)) %>% pivot_wider( names_from = mes_nome, values_from = custo,values_fill = 0) %>%  mutate_all(~replace(., is.na(.), 0))%>%
+  adorn_totals("col"),"Total"
+)
+
+
 ```
 
