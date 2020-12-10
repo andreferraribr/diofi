@@ -927,4 +927,27 @@ tabela(custos %>% filter (uo_cod == 25104, imovel_custo != "Nunes Machado") %>% 
 )
 
 ```
+### Encerramento
+=========================================
+
+```{r}
+media_ate_outubro <- custos  %>% filter (mes_nome %!in% c("Nov","Dec"), imovel_custo != "Nunes Machado" )%>% group_by(uo, uo_cod,ugr, ugr_cod, pi, pi_cod) %>% summarise(custo_medio = sum(custo)/10) %>% mutate (chave = paste0(ugr_cod,pi_cod))
+
+
+
+recursos_disp <- etapas %>% filter(item_cod %in% c (19,30), ugr_cod %!in% c (170166, 240101,183038,110255)) %>%group_by(uo, uo_cod, ugr, ugr_cod, pi, pi_cod) %>% summarise(saldo_recursos = sum(saldo)) %>% mutate (chave = paste0(ugr_cod,pi_cod)) 
+
+
+
+pago_apos_outubro <- custos  %>% filter (mes_nome %in% c("Nov","Dec"), imovel_custo != "Nunes Machado" )%>% group_by(uo, uo_cod,ugr, ugr_cod, pi, pi_cod) %>% summarise(pago_nov_dez = sum(custo)/10) %>% mutate (chave = paste0(ugr_cod,pi_cod))
+
+encerramento <- full_join(recursos_disp,media_ate_outubro %>% group_by(chave) %>% summarise(custo_medio = sum(custo_medio)) , by = "chave")
+
+encerramento <- full_join(encerramento,pago_apos_outubro  %>% group_by(chave) %>% summarise(pago_nov_dez = sum(pago_nov_dez)) , by = "chave")
+
+encerramento <- encerramento  %>% mutate(saldo_final = saldo_recursos - custo_medio + pago_nov_dez)%>% 
+  #  alterar NA por 0
+  mutate_all(~replace(., is.na(.), 0))
+
+```
 
