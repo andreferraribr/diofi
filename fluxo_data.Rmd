@@ -1,0 +1,39 @@
+---
+title: "fluxo_data"
+output: html_document
+---
+
+
+
+```{r função "tabela_siafi"}
+
+# funcao para tratar relatorio do Tesouro Gerencial
+
+tabela_siafi = function(tg){
+   # excluir as duas primeiras linhas, pois sao usadas para trazer a data da ultima extracao do SIAFI
+  df <- read_excel(tg, skip = 2)
+ 
+ 
+  dia <- read_excel(tg)
+  
+  tg_list <- list(df,dia[1,1])
+  return(tg_list)
+}
+```
+
+
+```{r função "tabela_dia"}
+
+# funcao para tratar relatorio do Tesouro Gerencial
+
+tabela_dia = function(tg){
+   # excluir as duas primeiras linhas, pois sao usadas para trazer a data da ultima extracao do SIAFI
+   return(datatable(read_excel(tg, skip = 2),caption = read_excel(tg, col_names = FALSE,n_max = 1) ))
+}
+```
+
+
+```{r}
+tabela_dia("AC.xlsx")
+```
+
