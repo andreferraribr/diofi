@@ -129,7 +129,7 @@ repasse <- read_excel("repasse.xlsx")
 efetuados <- read_excel("total_pago.xlsx")
 
 neccor<- data.frame("neccor" = unique(pago$neccor))
-#write.table(neccor, "C:/Users/03092181794/Desktop/R/diofi/neccor.txt", sep="\t")
+
 ```
 
 Agora vamos apresentar os pagentos realizados pela GRA/SC
